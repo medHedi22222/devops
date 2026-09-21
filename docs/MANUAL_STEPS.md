@@ -32,4 +32,8 @@ docker-compose up -d
 4. Create the SonarQube token → Jenkins credential `sonar-token`; configure the SonarQube server in Jenkins; create the webhook Sonar → Jenkins for `waitForQualityGate`.
 5. Create the Jenkins multibranch pipeline pointing at the Git repo.
 6. Set Vercel environment variables (`SECRET_KEY`, `JWT_SECRET_KEY`, …).
-7. Take the screenshots for the report.
+7. Configure Jenkins email notifications:
+   - Configure SMTP server in Jenkins → Configure System → E-mail Notification
+   - Set `$DEFAULT_RECIPIENTS` environment variable or configure in pipeline
+   - Test email configuration
+8. Take the screenshots for the report.

@@ -360,15 +360,53 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded - all security gates passed'
-            // Add notification here (email, Slack, etc.)
+            emailext(
+                subject: "SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                <p>Pipeline completed successfully!</p>
+                <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                <p><strong>Git Commit:</strong> ${env.GIT_COMMIT}</p>
+                <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
+                <p>All security gates passed. Reports are available in Jenkins.</p>
+                """,
+                to: '$DEFAULT_RECIPIENTS',
+                mimeType: 'text/html'
+            )
         }
         failure {
             echo 'Pipeline failed - security gates not met'
-            // Add notification here (email, Slack, etc.)
+            emailext(
+                subject: "FAILURE: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                <p>Pipeline failed - security gates not met!</p>
+                <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                <p><strong>Git Commit:</strong> ${env.GIT_COMMIT}</p>
+                <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
+                <p>Please review the security scan reports in Jenkins.</p>
+                <p><strong>Build URL:</strong> ${env.BUILD_URL}</p>
+                """,
+                to: '$DEFAULT_RECIPIENTS',
+                mimeType: 'text/html'
+            )
         }
         unstable {
             echo 'Pipeline unstable - non-blocking security issues found'
-            // Add notification here (email, Slack, etc.)
+            emailext(
+                subject: "UNSTABLE: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: """
+                <p>Pipeline unstable - non-blocking security issues found!</p>
+                <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                <p><strong>Git Commit:</strong> ${env.GIT_COMMIT}</p>
+                <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
+                <p>Non-blocking security issues were found. Please review and address them.</p>
+                <p><strong>Build URL:</strong> ${env.BUILD_URL}</p>
+                """,
+                to: '$DEFAULT_RECIPIENTS',
+                mimeType: 'text/html'
+            )
         }
     }
 }
