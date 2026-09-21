@@ -1,0 +1,61 @@
+# Basic Jenkinsfile (AS-IS) - Before security enhancements
+# This represents the state of the pipeline before DevSecOps improvements
+
+pipeline {
+    agent any
+    
+    stages {
+        // Stage 1: Checkout source code
+        stage('Checkout') {
+            steps {
+                checkout scm
+                echo 'Code checked out successfully'
+            }
+        }
+        
+        // Stage 2: Install dependencies
+        stage('Install') {
+            steps {
+                sh 'pip install -r requirements.txt'
+                sh 'pip install -r requirements-dev.txt'
+                echo 'Dependencies installed'
+            }
+        }
+        
+        // Stage 3: Run unit tests
+        stage('Unit Tests') {
+            steps {
+                sh 'pytest --cov=app --cov-report=xml'
+                echo 'Unit tests completed'
+            }
+        }
+        
+        // Stage 4: Build Docker image
+        stage('Build Image') {
+            steps {
+                sh 'docker build -t devsecops-flask:latest .'
+                echo 'Docker image built'
+            }
+        }
+        
+        // Stage 5: Deploy (placeholder - no actual deployment in as-is)
+        stage('Deploy') {
+            steps {
+                echo 'Deployment step (placeholder)'
+                echo 'In the as-is state, this would deploy without security checks'
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline completed'
+        }
+        success {
+            echo 'Pipeline succeeded'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
