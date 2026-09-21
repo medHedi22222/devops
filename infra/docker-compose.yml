@@ -19,9 +19,9 @@ services:
       - devsecops-network
     restart: unless-stopped
 
-  # SonarQube Community Edition
+  # SonarQube Community Edition (using available local image)
   sonarqube:
-    image: sonarqube:9.9.4-community
+    image: sonarqube:lts-community
     container_name: sonarqube
     depends_on:
       - sonarqube-db
@@ -39,7 +39,7 @@ services:
       - devsecops-network
     restart: unless-stopped
 
-  # PostgreSQL database for SonarQube
+  # PostgreSQL database for SonarQube (using available local image)
   sonarqube-db:
     image: postgres:15-alpine
     container_name: sonarqube-db
