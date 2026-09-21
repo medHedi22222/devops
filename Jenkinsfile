@@ -335,12 +335,21 @@ pipeline {
                         # Install Vercel CLI
                         npm install -g vercel
                         
-                        # Deploy to production
-                        vercel deploy --prod --yes --token $VERCEL_TOKEN
+                        # Set Vercel environment variables
+                        export VERCEL_ORG_ID=$VERCEL_ORG_ID
+                        export VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID
                         
-                        # Smoke test
-                        sleep 5
-                        curl -f https://your-vercel-url.vercel.app/health || exit 1
+                        # Deploy to production
+                        vercel deploy --prod --yes --token=$VERCEL_TOKEN
+                        
+                        # Get the deployment URL
+                        DEPLOYMENT_URL=$(vercel ls --prod --token=$VERCEL_TOKEN | head -n 2 | tail -n 1 | awk '{print $2}')
+                        
+                        # Smoke test the deployed application
+                        sleep 10
+                        curl -f $DEPLOYMENT_URL/health || exit 1
+                        
+                        echo "Vercel deployment successful: $DEPLOYMENT_URL"
                     '''
                 }
             }

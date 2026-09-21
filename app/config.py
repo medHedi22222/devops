@@ -25,6 +25,10 @@ class Config:
     
     # Database configuration
     DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
+    # For Vercel/serverless environments, use /tmp for SQLite
+    if os.environ.get('VERCEL') or DATABASE_URL.startswith('sqlite:///'):
+        if not DATABASE_URL.startswith('sqlite:////tmp'):
+            DATABASE_URL = DATABASE_URL.replace('sqlite:///', 'sqlite:////tmp/')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
