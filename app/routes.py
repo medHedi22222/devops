@@ -15,6 +15,24 @@ def health():
     """
     return jsonify({'status': 'ok'}), 200
 
+@routes_bp.route('/', methods=['GET'])
+def index():
+    """
+    Root endpoint.
+    Returns basic information about the API.
+    """
+    return jsonify({
+        'message': 'DevSecOps Flask API',
+        'version': '1.0.0',
+        'endpoints': {
+            'health': '/health',
+            'register': '/auth/register',
+            'login': '/auth/login',
+            'me': '/auth/me',
+            'protected': '/protected'
+        }
+    }), 200
+
 @routes_bp.route('/protected', methods=['GET'])
 @jwt_required()
 def protected():
