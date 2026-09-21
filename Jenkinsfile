@@ -6,7 +6,7 @@ pipeline {
     
     // Environment variables
     environment {
-        DOCKER_IMAGE_NAME = "YOUR_DOCKERHUB_USERNAME/devsecops-flask"
+        DOCKER_IMAGE_NAME = "bensalahmohamedhedi19/devops"
         DOCKER_TAG = "${env.GIT_COMMIT.take(7)}"
         REPORTS_DIR = "reports"
     }
