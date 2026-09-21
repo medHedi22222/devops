@@ -1,0 +1,75 @@
+# Pre-commit configuration for DevSecOps shift-left security
+# Run: pre-commit install
+# Run all checks: pre-commit run --all-files
+
+repos:
+  # Gitleaks - Secrets detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+        name: Gitleaks - Secrets Scanner
+        entry: gitleaks detect --source . --verbose
+        language: golang
+        types: [python, text]
+        pass_filenames: false
+
+  # Bandit - Python SAST (Static Application Security Testing)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: Bandit - Python Security Linter
+        args: ['-r', 'app/', '-f', 'txt']
+        files: ^app/
+
+  # Semgrep - Custom and security-focused rules
+  - repo: https://github.com/returntocorp/semgrep
+    rev: v1.45.0
+    hooks:
+      - id: semgrep
+        name: Semgrep - Security-focused SAST
+        args: ['--config', '.semgrep/custom.yaml', '--config', 'auto']
+        files: ^app/
+
+  # Basic hygiene hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+        name: Detect private keys
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: mixed-line-ending
+        name: Check for mixed line endings
+        args: ['--fix=lf']
+
+  # Python-specific checks
+  - repo: https://github.com/psf/black
+    rev: 23.12.0
+    hooks:
+      - id: black
+        name: Black - Python code formatter
+        language_version: python3.11
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        name: Flake8 - Python style guide enforcement
+        args: ['--max-line-length=100', '--ignore=E203,W503']

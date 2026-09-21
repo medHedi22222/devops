@@ -1,0 +1,6 @@
+# Trivy ignore file for vulnerability exemptions
+# Each exemption must include justification and expiry date
+# Format: vulnerability-id:package:version # justification | expiry: YYYY-MM-DD
+
+# Example exemptions (none currently active - remove when adding real exemptions)
+# CVE-2021-12345:package-name:1.0.0 # False positive - package not used in production context | expiry: 2024-12-31

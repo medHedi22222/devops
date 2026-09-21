@@ -1,0 +1,58 @@
+# Gitleaks configuration for secrets detection
+# Custom rules and allowlists for the DevSecOps project
+
+# Extend default rules
+extend-default = true
+
+# Custom rules for project-specific patterns
+[[rules]]
+description = "GitHub Personal Access Token"
+id = "github-pat"
+regex = '''ghp_[a-zA-Z0-9]{36}'''
+keywords = ["ghp_"]
+
+[[rules]]
+description = "AWS Access Key ID"
+id = "aws-access-key"
+regex = '''AKIA[0-9A-Z]{16}'''
+keywords = ["AKIA"]
+
+[[rules]]
+description = "Slack Token"
+id = "slack-token"
+regex = '''xox[baprs]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}'''
+keywords = ["xoxb", "xoxp", "xoxa", "xoxr", "xoxs"]
+
+# Allowlist for known false positives
+[allowlist]
+description = "Global allowlist for known false positives"
+
+# Allow test files
+paths = [
+  '''tests/''',
+  '''\.test\.py$''',
+]
+
+# Allow example configurations
+paths = [
+  '''\.example$''',
+  '''\.example\.[a-z]+$''',
+]
+
+# Allow specific comment patterns that indicate placeholders
+regexes = [
+  '''placeholder''',
+  '''example''',
+  '''test''',
+  '''your-''',
+  '''replace-with''',
+]
+
+# Allow common development values
+regexes = [
+  '''localhost''',
+  '''127\.0\.0\.1''',
+  '''0\.0\.0\.0''',
+  '''test-secret''',
+  '''dev-secret''',
+]

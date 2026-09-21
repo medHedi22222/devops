@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    // Security tools
+    "SonarSource.sonarlint-vscode",
+    "returntocorp.semgrep",
+    "GitLab.gitlab-workflow",
+    
+    // Python development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-python.flake8",
+    
+    // Docker
+    "ms-azuretools.vscode-docker",
+    
+    // General development
+    "eamodio.gitlens",
+    "GitHub.copilot",
+    "GitHub.vscode-pull-request-github"
+  ]
+}
