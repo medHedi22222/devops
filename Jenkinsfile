@@ -169,7 +169,7 @@ pipeline {
                 echo 'Scanning dependencies with Trivy'
                 sh '''
                     mkdir -p ${REPORTS_DIR}
-                    docker run --rm -v ${WORKSPACE}:/src aquasec/trivy:0.47.0 fs --format json --output /src/${REPORTS_DIR}/trivy-fs-report.json --severity CRITICAL,HIGH,MEDIUM,LOW /src || true
+                    docker run --rm -v trivy-cache:/root/.cache -v ${WORKSPACE}:/src aquasec/trivy:0.47.0 fs --format json --output /src/${REPORTS_DIR}/trivy-fs-report.json --severity CRITICAL,HIGH,MEDIUM,LOW /src || true
                 '''
                 script {
                     // Parse Trivy output and fail on CRITICAL/HIGH
@@ -227,7 +227,7 @@ pipeline {
                 echo 'Scanning Docker image with Trivy'
                 sh '''
                     mkdir -p ${REPORTS_DIR}
-                    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.47.0 image --format json --output ${REPORTS_DIR}/trivy-image-report.json --severity CRITICAL,HIGH,MEDIUM,LOW ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} || true
+                    docker run --rm -v trivy-cache:/root/.cache -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.47.0 image --format json --output ${REPORTS_DIR}/trivy-image-report.json --severity CRITICAL,HIGH,MEDIUM,LOW ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} || true
                 '''
                 script {
                     // Parse Trivy output and fail on CRITICAL/HIGH
