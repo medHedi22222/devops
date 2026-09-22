@@ -1,3 +1,4 @@
+﻿# DEMO: intentionally old base image python:3.7-slim for Trivy — do not merge
 # Multi-stage Dockerfile for Flask application
 # - Pinned base image (no :latest)
 # - Non-root runtime user
@@ -7,7 +8,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build / install Python dependencies
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.7-slim AS builder
 
 WORKDIR /app
 
@@ -23,7 +24,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ---------------------------------------------------------------------------
 # Stage 2: minimal runtime image
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim-bookworm
+FROM python:3.7-slim
 
 WORKDIR /app
 
@@ -36,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy installed packages from builder into system paths
 COPY --from=builder /install /usr/local
 
-# Application code only (no .env, no tests — see .dockerignore)
+# Application code only (no .env, no tests â€” see .dockerignore)
 COPY app/ ./app/
 COPY wsgi.py .
 
@@ -52,3 +53,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 
 # Secrets must be provided at runtime (e.g. docker run --env-file .env)
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "wsgi:app"]
+
+
