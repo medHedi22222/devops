@@ -141,12 +141,13 @@ jobs:
       - name: Run Semgrep (custom project rules)
         run: |
           mkdir -p reports
-          # Image entrypoint is already "semgrep" — pass args only.
+          # Invoke Semgrep explicitly; this image version has no semgrep entrypoint.
           # --error → non-zero exit on ERROR severity (blocks the pipeline)
           docker run --rm \
             -v "$PWD:/src" \
             -w /src \
             ${{ env.SEMGREP_IMAGE }} \
+            semgrep \
             --config .semgrep/custom.yaml \
             --error \
             --metrics=off \
