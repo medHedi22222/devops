@@ -99,7 +99,7 @@ pipeline {
                         sh '''
                             mkdir -p ${REPORTS_DIR}
                             . venv/bin/activate
-                            semgrep --config .semgrep/custom.yaml --config auto --json --output ${REPORTS_DIR}/semgrep-report.json app || true
+                            semgrep --config .semgrep/custom.yaml --config auto --json --output ${REPORTS_DIR}/semgrep-report.json --metrics=off app || true
                         '''
                     }
                     post {
@@ -152,15 +152,16 @@ pipeline {
         }
         
         // Stage 5: SonarQube Quality Gate
-        stage('SonarQube Quality Gate') {
-            steps {
-                script {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
-                }
-            }
-        }
+        // Temporarily disabled - requires SonarQube analysis stage
+        // stage('SonarQube Quality Gate') {
+        //     steps {
+        //         script {
+        //             timeout(time: 5, unit: 'MINUTES') {
+        //                 waitForQualityGate abortPipeline: true
+        //             }
+        //         }
+        //     }
+        // }
         
         // Stage 6: Dependency scanning with Trivy
         stage('Scan Dependencies') {
