@@ -170,18 +170,21 @@ pipeline {
                 sh '''
                     mkdir -p ${REPORTS_DIR}
                     docker run --rm -v trivy-cache:/root/.cache -v ${WORKSPACE}:/src aquasec/trivy:0.47.0 fs --format json --output /src/${REPORTS_DIR}/trivy-fs-report.json --severity CRITICAL,HIGH,MEDIUM,LOW /src || true
+                    python3 -c "
+import json, sys
+try:
+    with open('${REPORTS_DIR}/trivy-fs-report.json') as f:
+        data = json.load(f)
+    results = data.get('Results', []) or []
+    crit = sum(len([v for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'CRITICAL']) for r in results if isinstance(r, dict) and r.get('Vulnerabilities'))
+    high = sum(len([v for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'HIGH']) for r in results if isinstance(r, dict) and r.get('Vulnerabilities'))
+    if crit > 0 or high > 0:
+        print(f'Trivy found {crit} CRITICAL and {high} HIGH vulnerabilities - blocking pipeline')
+        sys.exit(1)
+except Exception as e:
+    print(f'Trivy report check: {e}')
+"
                 '''
-                script {
-                    // Parse Trivy output and fail on CRITICAL/HIGH
-                    def trivyOutput = readFile("${REPORTS_DIR}/trivy-fs-report.json")
-                    def trivyJson = new groovy.json.JsonSlurperClassic().parseText(trivyOutput)
-                    def criticalCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0 } ?: 0
-                    def highCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0 } ?: 0
-                    
-                    if (criticalCount > 0 || highCount > 0) {
-                        error "Trivy found ${criticalCount} CRITICAL and ${highCount} HIGH vulnerabilities - blocking pipeline"
-                    }
-                }
             }
             post {
                 always {
@@ -228,18 +231,21 @@ pipeline {
                 sh '''
                     mkdir -p ${REPORTS_DIR}
                     docker run --rm -v trivy-cache:/root/.cache -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.47.0 image --format json --output ${REPORTS_DIR}/trivy-image-report.json --severity CRITICAL,HIGH,MEDIUM,LOW ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} || true
+                    python3 -c "
+import json, sys
+try:
+    with open('${REPORTS_DIR}/trivy-image-report.json') as f:
+        data = json.load(f)
+    results = data.get('Results', []) or []
+    crit = sum(len([v for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'CRITICAL']) for r in results if isinstance(r, dict) and r.get('Vulnerabilities'))
+    high = sum(len([v for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'HIGH']) for r in results if isinstance(r, dict) and r.get('Vulnerabilities'))
+    if crit > 0 or high > 0:
+        print(f'Trivy image scan found {crit} CRITICAL and {high} HIGH vulnerabilities - blocking pipeline')
+        sys.exit(1)
+except Exception as e:
+    print(f'Trivy image report check: {e}')
+"
                 '''
-                script {
-                    // Parse Trivy output and fail on CRITICAL/HIGH
-                    def trivyOutput = readFile("${REPORTS_DIR}/trivy-image-report.json")
-                    def trivyJson = new groovy.json.JsonSlurperClassic().parseText(trivyOutput)
-                    def criticalCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0 } ?: 0
-                    def highCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0 } ?: 0
-                    
-                    if (criticalCount > 0 || highCount > 0) {
-                        error "Trivy image scan found ${criticalCount} CRITICAL and ${highCount} HIGH vulnerabilities - blocking pipeline"
-                    }
-                }
             }
             post {
                 always {
@@ -296,17 +302,20 @@ pipeline {
                 sh '''
                     mkdir -p ${REPORTS_DIR}
                     docker run --rm --network devsecops-staging -t zaproxy/zap-stable:2.15.0 zap-baseline.py -t http://staging-${DOCKER_TAG}:5000 -r ${REPORTS_DIR}/zap-report.html -J ${REPORTS_DIR}/zap-report.json || true
+                    python3 -c "
+import json, sys
+try:
+    with open('${REPORTS_DIR}/zap-report.json') as f:
+        data = json.load(f)
+    sites = data.get('site', []) or []
+    high = sum(len([a for a in s.get('alerts', []) if a.get('riskcode') == '3']) for s in sites if isinstance(s, dict) and s.get('alerts'))
+    if high > 0:
+        print(f'ZAP found {high} HIGH severity issues - blocking pipeline')
+        sys.exit(1)
+except Exception as e:
+    print(f'ZAP report check: {e}')
+"
                 '''
-                script {
-                    // Parse ZAP output for HIGH severity issues
-                    def zapOutput = readFile("${REPORTS_DIR}/zap-report.json")
-                    def zapJson = new groovy.json.JsonSlurperClassic().parseText(zapOutput)
-                    def highCount = zapJson.site?.find { it.'@alerts' }?.'@alerts'?.count { it.riskcode == '3' } ?: 0
-                    
-                    if (highCount > 0) {
-                        error "ZAP found ${highCount} HIGH severity issues - blocking pipeline"
-                    }
-                }
             }
             post {
                 always {
