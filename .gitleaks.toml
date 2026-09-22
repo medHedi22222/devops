@@ -47,4 +47,6 @@ regexes = [
   '''0\.0\.0\.0''',
   '''test-secret''',
   '''dev-secret''',
+  '''AKIAIOSFODNN7EXAMPLE''',  # Demo key from documentation
+  '''sk-1234567890abcdefghijklmnopqrstuvwxyz''',  # Demo key from documentation
 ]
