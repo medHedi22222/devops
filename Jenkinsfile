@@ -62,7 +62,8 @@ pipeline {
                 echo 'Scanning for secrets with Gitleaks'
                 sh '''
                     mkdir -p ${REPORTS_DIR}
-                    docker run --rm -v ${WORKSPACE}:/src zricethezav/gitleaks:v8.18.0 detect --source /src --config /src/.gitleaks.toml --verbose --report-path /src/${REPORTS_DIR}/gitleaks-report.json --report-format json || true
+                    chmod 777 ${REPORTS_DIR}
+                    docker run --rm -v ${WORKSPACE}:/src -u $(id -u):$(id -g) zricethezav/gitleaks:v8.18.0 detect --source /src --config /src/.gitleaks.toml --verbose --report-path /src/${REPORTS_DIR}/gitleaks-report.json --report-format json || true
                 '''
                 script {
                     // Only check if the report file exists
@@ -78,7 +79,13 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: "${REPORTS_DIR}/gitleaks-report.json", fingerprint: true
+                    script {
+                        if (fileExists("${REPORTS_DIR}/gitleaks-report.json")) {
+                            archiveArtifacts artifacts: "${REPORTS_DIR}/gitleaks-report.json", fingerprint: true
+                        } else {
+                            echo 'Gitleaks report not available for archiving'
+                        }
+                    }
                 }
             }
         }

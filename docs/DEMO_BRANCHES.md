@@ -16,8 +16,8 @@ These branches contain intentional security vulnerabilities to demonstrate that 
 
 **What it contains**:
 - File: `app/demo_secrets.py`
-- Intentionally leaked fake AWS access key: `AKIAIOSFODNN7EXAMPLE`
-- Intentionally leaked fake API key: `sk-1234567890abcdefghijklmnopqrstuvwxyz`
+- Intentionally leaked fake AWS access key (example format: AKIA...)
+- Intentionally leaked fake API key (example format: sk-...)
 
 **Expected detection**:
 - **Tool**: Gitleaks
