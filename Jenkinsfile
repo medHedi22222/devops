@@ -1,6 +1,3 @@
-# Secured Jenkinsfile with DevSecOps pipeline
-# This implements the "to-be" pipeline with comprehensive security controls
-
 pipeline {
     agent any
     
