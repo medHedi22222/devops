@@ -1,6 +1,8 @@
-Flask==3.0.3
+﻿Flask==3.0.3
 Flask-JWT-Extended==4.6.0
 Flask-SQLAlchemy==3.1.1
 python-dotenv==1.0.1
 gunicorn==22.0.0
 werkzeug==3.0.3
+# DEMO: intentionally vulnerable pin (CVE-2023-32681 etc.) — do not merge
+requests==2.6.0
