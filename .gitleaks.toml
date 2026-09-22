@@ -27,29 +27,21 @@ keywords = ["xoxb", "xoxp", "xoxa", "xoxr", "xoxs"]
 [allowlist]
 description = "Global allowlist for known false positives"
 
-# Allow test files
+# Allow test files and example configurations
 paths = [
   '''tests/''',
   '''\.test\.py$''',
-]
-
-# Allow example configurations
-paths = [
   '''\.example$''',
   '''\.example\.[a-z]+$''',
 ]
 
-# Allow specific comment patterns that indicate placeholders
+# Allow specific comment patterns and common development values
 regexes = [
   '''placeholder''',
   '''example''',
   '''test''',
   '''your-''',
   '''replace-with''',
-]
-
-# Allow common development values
-regexes = [
   '''localhost''',
   '''127\.0\.0\.1''',
   '''0\.0\.0\.0''',
