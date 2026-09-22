@@ -1,6 +1,7 @@
 # Quality Gates Documentation
 
-This document defines the quality gates and thresholds for the CI/CD pipeline, explaining the rationale behind each threshold.
+This document defines the quality gates and thresholds for the GitHub Actions
+CI/CD pipeline (`.github/workflows/devsecops.yml`), explaining the rationale behind each threshold.
 
 ## Quality Gate Philosophy
 

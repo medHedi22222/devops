@@ -1,0 +1,35 @@
+# =============================================================================
+# AS-IS pipeline (BEFORE DevSecOps) — insecure baseline for comparison
+# =============================================================================
+# This workflow intentionally has NO security scanning.
+# Trigger manually (Actions → As-Is Pipeline → Run workflow) to show the
+# professor what a naive CI looked like before shift-left controls.
+# It is NOT run automatically on push.
+# =============================================================================
+
+name: As-Is Pipeline (no security)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-fake-deploy:
+    name: Checkout → Install → Test → "Deploy"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install & test (no scanners)
+        env:
+          SECRET_KEY: test-secret-key-for-ci-must-be-32b
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-32bytes!!
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+          pytest -q
+
+      - name: Fake deploy (no image scan, no secrets check)
+        run: echo "Would deploy untrusted artifact — this is the insecure baseline."

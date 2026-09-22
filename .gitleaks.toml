@@ -1,10 +1,8 @@
 # Gitleaks configuration for secrets detection
-# Custom rules and allowlists for the DevSecOps project
+# Custom rules + allowlist for known false positives (never allowlist real secrets)
 
-# Extend default rules
 extend-default = true
 
-# Custom rules for project-specific patterns
 [[rules]]
 description = "GitHub Personal Access Token"
 id = "github-pat"
@@ -23,11 +21,11 @@ id = "slack-token"
 regex = '''xox[baprs]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}'''
 keywords = ["xoxb", "xoxp", "xoxa", "xoxr", "xoxs"]
 
-# Allowlist for known false positives
 [allowlist]
-description = "Global allowlist for known false positives"
+description = "Global allowlist for known false positives (placeholders only)"
 
-# Allow test files and example configurations
+# Demo secrets intentionally live on demo/* branches and must NOT be allowlisted,
+# otherwise the leaked-secret demo would never fail.
 paths = [
   '''tests/''',
   '''\.test\.py$''',
@@ -35,18 +33,11 @@ paths = [
   '''\.example\.[a-z]+$''',
 ]
 
-# Allow specific comment patterns and common development values
 regexes = [
   '''placeholder''',
-  '''example''',
-  '''test''',
   '''your-''',
   '''replace-with''',
   '''localhost''',
   '''127\.0\.0\.1''',
   '''0\.0\.0\.0''',
-  '''test-secret''',
-  '''dev-secret''',
-  '''AKIAIOSFODNN7EXAMPLE''',  # Demo key from documentation
-  '''sk-1234567890abcdefghijklmnopqrstuvwxyz''',  # Demo key from documentation
 ]

@@ -1,36 +1,21 @@
-services:
-  # Jenkins with Docker CLI access
-  jenkins:
-    image: jenkins/jenkins:lts-jdk17
-    container_name: jenkins
-    privileged: true
-    user: root
-    ports:
-      - "8080:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/bin/docker
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-      - JENKINS_OPTS=--httpPort=8080
-    networks:
-      - devsecops-network
-    restart: unless-stopped
+# Optional local SonarQube only (no Jenkins).
+# Start with: docker compose -f infra/docker-compose.yml up -d
+# Then point SonarLint / sonar-scanner at http://localhost:9000
+#
+# The CI/CD pipeline itself runs on GitHub Actions — not Jenkins.
 
-  # SonarQube Community Edition (using available local image)
+services:
   sonarqube:
-    image: sonarqube:lts-community
+    image: sonarqube:10.4.1-community
     container_name: sonarqube
     depends_on:
       - sonarqube-db
     ports:
       - "9000:9000"
     environment:
-      - SONAR_JDBC_URL=jdbc:postgresql://sonarqube-db:5432/sonar
-      - SONAR_JDBC_USERNAME=sonar
-      - SONAR_JDBC_PASSWORD=sonar
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
@@ -39,27 +24,23 @@ services:
       - devsecops-network
     restart: unless-stopped
 
-  # PostgreSQL database for SonarQube (using available local image)
   sonarqube-db:
-    image: postgres:15-alpine
+    image: postgres:15.6-alpine
     container_name: sonarqube-db
     environment:
-      - POSTGRES_USER=sonar
-      - POSTGRES_PASSWORD=sonar
-      - POSTGRES_DB=sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
     volumes:
-      - postgresql:/var/lib/postgresql
       - postgresql_data:/var/lib/postgresql/data
     networks:
       - devsecops-network
     restart: unless-stopped
 
 volumes:
-  jenkins_home:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:
-  postgresql:
   postgresql_data:
 
 networks:

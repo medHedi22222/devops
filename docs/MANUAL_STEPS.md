@@ -1,46 +1,72 @@
-# Manual Steps Documentation
+# Étapes manuelles (GitHub Actions)
 
-This document lists all steps that must be performed manually outside of the repository.
+Ce projet n’utilise **plus Jenkins**. Toute la CI/CD tourne sur **GitHub Actions**.
+Les secrets ne doivent jamais être commités.
 
-## Prerequisites
+## 1. Secrets GitHub (Settings → Secrets and variables → Actions)
 
-1. Install Docker Desktop on your development machine
-2. Install Docker Compose (usually included with Docker Desktop)
-3. Ensure Docker is running before attempting to build images or start services
+### Obligatoires pour un `master` vert (scans seuls)
 
-## Docker Installation and Testing
+Aucun secret n’est requis pour les jobs de test / Gitleaks / Semgrep / Bandit / Trivy.
+Un push sur `master` propre doit déjà passer au vert.
 
-The Dockerfile and docker-compose.yml have been created, but Docker must be installed locally to test them:
+### Optionnels — push Docker Hub (job 6)
+
+| Secret | Valeur |
+|--------|--------|
+| `DOCKERHUB_USERNAME` | votre user Docker Hub |
+| `DOCKERHUB_TOKEN` | Access Token (Account Settings → Security) |
+
+Sans ces secrets, le job **skip** le push (notice dans les logs) — le pipeline reste vert.
+
+### Optionnels — déploiement Vercel (job 7)
+
+| Secret | Valeur |
+|--------|--------|
+| `VERCEL_TOKEN` | token Vercel |
+| `VERCEL_ORG_ID` | id org (`vercel link`) |
+| `VERCEL_PROJECT_ID` | id projet |
+| `VERCEL_URL` | URL prod (ex. `https://xxx.vercel.app`) pour le smoke test `/health` |
+
+### Variables d’environnement sur Vercel (dashboard)
+
+- `SECRET_KEY`
+- `JWT_SECRET_KEY`
+- `JWT_ACCESS_TOKEN_EXPIRES=900`
+- `DATABASE_URL` (optionnel → SQLite sous `/tmp` sur Vercel)
+
+## 2. Activer Actions
+
+Repository → **Actions** → autoriser les workflows s’ils sont désactivés.
+
+## 3. Démo professeur (branches)
+
+Les branches locales `demo/*` doivent être poussées :
 
 ```bash
-# Build the Docker image
-docker build -t devsecops-flask:test .
-
-# Run the container with environment variables
-docker run --env-file .env -p 5000:5000 devsecops-flask:test
-
-# Start Jenkins and SonarQube infrastructure
-cd infra
-docker-compose up -d
+git push -u origin demo/leaked-secret
+git push -u origin demo/insecure-code
+git push -u origin demo/vulnerable-dependency
+git push -u origin demo/vulnerable-image
+git push origin master
 ```
 
-## Steps that require manual intervention (from original requirements)
+Puis dans **Actions**, montrer :
 
-1. Create a **Docker Hub access token** (Account Settings → Security) → Jenkins credential `dockerhub-creds` (username + token).
-2. Create a **Vercel project + token**, get `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (`vercel link`) → Jenkins credentials.
-3. Start Jenkins/SonarQube with `docker compose up -d`, install suggested plugins + SonarQube Scanner, HTML Publisher, Docker Pipeline, Credentials Binding, Mailer/Slack.
-4. Create the SonarQube token → Jenkins credential `sonar-token`; configure the SonarQube server in Jenkins; create the webhook Sonar → Jenkins for `waitForQualityGate`.
-5. Create the Jenkins multibranch pipeline pointing at the Git repo.
-6. Set Vercel environment variables:
-   - Navigate to Vercel project dashboard → Settings → Environment Variables
-   - Add required variables:
-     - `SECRET_KEY`: Strong random string (≥32 characters)
-     - `JWT_SECRET_KEY`: Strong random string (≥32 characters)
-     - `JWT_ACCESS_TOKEN_EXPIRES`: 900 (15 minutes)
-     - `DATABASE_URL`: (optional, will default to sqlite:////tmp/app.db)
-   - Select appropriate environments (Production, Preview, Development)
-7. Configure Jenkins email notifications:
-   - Configure SMTP server in Jenkins → Configure System → E-mail Notification
-   - Set `$DEFAULT_RECIPIENTS` environment variable or configure in pipeline
-   - Test email configuration
-8. Take the screenshots for the report.
+1. `master` → tous les jobs verts  
+2. chaque `demo/*` → échec au job attendu  
+
+## 4. SonarQube local (optionnel)
+
+```bash
+cd infra
+docker compose up -d
+# UI http://localhost:9000 (admin/admin au 1er login)
+```
+
+Pas branché à la CI cloud (pas de Jenkins). Utile pour SonarLint en local.
+
+## 5. Captures d’écran pour le rapport
+
+Pour chaque démo : run GitHub Actions rouge + rapport artifact.  
+Pour `master` : run vert + (si configuré) image Docker Hub + `/health` Vercel.

@@ -1,67 +1,71 @@
 # DevSecOps Flask App
 
-A simple Flask application with JWT authentication protected by a comprehensive DevSecOps CI/CD pipeline.
+Small Flask + JWT app protected by a **GitHub Actions DevSecOps pipeline**
+(SAST, SCA, secrets scan, container scan). Bad code fails the pipeline; clean
+`master` goes green.
 
-## Getting Started
+## Quick start
 
-### Prerequisites
-- Python 3.9+
-- Docker
-- Docker Compose
-
-### Local Development
-
-1. Create a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-```
-
-3. Create environment file:
-```bash
-cp .env.example .env
-# Edit .env with your actual values
-```
-
-4. Run the application:
-```bash
+# Windows: venv\Scripts\activate
+source venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env   # then edit real values — never commit .env
+pytest --cov=app --cov-report=xml
 python wsgi.py
 ```
 
-### Running Tests
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SECRET_KEY` | yes | Flask secret (≥32 chars) |
+| `JWT_SECRET_KEY` | yes | JWT signing key (≥32 chars) |
+| `JWT_ACCESS_TOKEN_EXPIRES` | no | Seconds (default `900`) |
+| `DATABASE_URL` | no | Default `sqlite:///app.db` (`/tmp` on Vercel) |
+
+## API
+
+- `GET /health` → `{"status":"ok"}`
+- `POST /auth/register` → create user
+- `POST /auth/login` → JWT access token
+- `GET /auth/me` → current user (Bearer token)
+
+## Pipeline (GitHub Actions)
+
+Workflow: [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml)
+
+| Stage | Tool | Blocks? |
+|-------|------|---------|
+| Install & Test | pytest + coverage | yes |
+| Secrets | Gitleaks | yes (any secret) |
+| SAST | Semgrep + Bandit | yes (ERROR / HIGH+) |
+| SCA | Trivy FS + pip-audit | yes (CRITICAL/HIGH) |
+| Docker build & scan | Trivy image | yes (CRITICAL/HIGH) |
+| Docker Hub push | docker | `master` only (if secrets set) |
+| Vercel deploy | Vercel CLI | `master` only (if secrets set) |
+
+Baseline (no security) for before/after comparison:
+[`.github/workflows/as-is.yml`](.github/workflows/as-is.yml) — run manually.
+
+### Demo branches (must fail)
+
+| Branch | Fails at |
+|--------|----------|
+| `demo/leaked-secret` | Secrets (Gitleaks) |
+| `demo/insecure-code` | SAST |
+| `demo/vulnerable-dependency` | SCA |
+| `demo/vulnerable-image` | Docker scan |
+
+Never merge these into `master`.
+
+### Local scans
 
 ```bash
-pytest --cov=app --cov-report=xml
+make scan-local
 ```
 
-### Environment Variables
+## Docs
 
-- `SECRET_KEY`: Flask secret key
-- `JWT_SECRET_KEY`: JWT signing key
-- `JWT_ACCESS_TOKEN_EXPIRES`: Token expiration time in seconds (default: 900)
-- `DATABASE_URL`: Database connection string (default: sqlite:///app.db)
-
-## API Endpoints
-
-- `GET /health` - Health check
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login (returns JWT token)
-- `GET /auth/me` - Get current user (requires JWT token)
-
-## Pipeline
-
-This project includes a comprehensive Jenkins CI/CD pipeline with integrated security controls:
-- SAST (Semgrep, Bandit)
-- SCA (Trivy, pip-audit)
-- DAST (OWASP ZAP)
-- Secrets scanning (Gitleaks)
-- Container scanning (Trivy)
-- SonarQube quality gates
-
-See `docs/` for detailed documentation.
+See `docs/` (French report, quality gates, manual GitHub secrets setup).

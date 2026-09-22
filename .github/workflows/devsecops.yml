@@ -1,165 +1,392 @@
-name: DevSecOps CI/CD Pipeline
+# =============================================================================
+# DevSecOps CI/CD Pipeline (GitHub Actions)
+# =============================================================================
+# Purpose: shift-left security gates that BLOCK on High/Critical findings and
+#          secrets, and succeed end-to-end when the code is clean.
+#
+# Jobs (map to the secured pipeline stages):
+#   1. install_and_test     — pytest + coverage          [BLOCKING]
+#   2. secrets_scan         — Gitleaks                   [BLOCKING]
+#   3. sast                 — Semgrep + Bandit           [BLOCKING on ERROR/HIGH]
+#   4. scan_dependencies    — Trivy FS + pip-audit       [BLOCKING on CRITICAL/HIGH]
+#   5. docker_build_scan    — build + Trivy image        [BLOCKING on CRITICAL/HIGH]
+#   6. docker_push          — Docker Hub (master only)   [optional if secrets set]
+#   7. deploy_vercel        — Vercel (master only)       [optional if secrets set]
+#
+# Demo branches (never merge to master):
+#   demo/leaked-secret          → fails at secrets_scan
+#   demo/insecure-code          → fails at sast
+#   demo/vulnerable-dependency  → fails at scan_dependencies
+#   demo/vulnerable-image       → fails at docker_build_scan
+# =============================================================================
+
+name: DevSecOps Pipeline
 
 on:
   push:
-    branches: [ master, demo/* ]
+    branches: [master, "demo/**"]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  # Pinned scanner images (no :latest)
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.18.4
+  SEMGREP_IMAGE: semgrep/semgrep:1.45.0
+  TRIVY_IMAGE: aquasec/trivy:0.50.1
+  DOCKER_IMAGE_NAME: bensalahmohamedhedi19/devops
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
 
 jobs:
-  security-scan:
-    name: Security Scanning
+  # ---------------------------------------------------------------------------
+  # 1. Install dependencies and run unit tests (blocking)
+  # ---------------------------------------------------------------------------
+  install_and_test:
+    name: "1 · Install & Test"
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-      
-      - name: Run tests with coverage
-        run: |
-          pip install pytest pytest-cov
-          pytest --cov=app --cov-report=xml --cov-report=html
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-      
-      - name: Run Gitleaks (Secrets Scanning)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-      
-      - name: Run Semgrep (SAST)
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: .semgrep/custom.yaml
-      
-      - name: Run Bandit (Python SAST)
-        run: |
-          pip install bandit
-          bandit -r app -f json -o bandit-report.json || true
-      
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            bandit-report.json
-            coverage.xml
-            htmlcov/
-      
-      - name: Security check summary
-        if: always()
-        run: |
-          echo "Security scanning completed"
-          echo "Check uploaded artifacts for detailed reports"
+          pip install -r requirements.txt -r requirements-dev.txt
 
-  docker-build:
-    name: Docker Build and Scan
+      - name: Run pytest with coverage
+        env:
+          SECRET_KEY: test-secret-key-for-ci-must-be-32b
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-32bytes!!
+          JWT_ACCESS_TOKEN_EXPIRES: "900"
+        run: |
+          mkdir -p reports
+          pytest --cov=app --cov-report=xml:reports/coverage.xml \
+                 --cov-report=term-missing --junitxml=reports/pytest.xml -q
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 2. Secrets scanning with Gitleaks (blocking — any finding fails the job)
+  # ---------------------------------------------------------------------------
+  secrets_scan:
+    name: "2 · Secrets Scan (Gitleaks)"
     runs-on: ubuntu-latest
-    needs: security-scan
-    if: github.ref == 'refs/heads/master'
-    
+    needs: install_and_test
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-      
+
+      - name: Run Gitleaks
+        run: |
+          mkdir -p reports
+          # --no-git scans the working tree (current branch files).
+          # This catches demo/leaked-secret and avoids false fails from old
+          # example strings that may still exist deeper in git history.
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ env.GITLEAKS_IMAGE }} \
+            detect --source /src \
+                   --no-git \
+                   --config /src/.gitleaks.toml \
+                   --report-path /src/reports/gitleaks-report.json \
+                   --report-format json \
+                   --verbose
+
+      - name: Upload Gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: reports/gitleaks-report.json
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 3. SAST — Semgrep + Bandit (blocking on high/error findings)
+  # ---------------------------------------------------------------------------
+  sast:
+    name: "3 · SAST (Semgrep + Bandit)"
+    runs-on: ubuntu-latest
+    needs: install_and_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install Bandit
+        run: pip install "bandit==1.7.5" "pbr>=5.0"
+
+      - name: Run Semgrep (custom project rules)
+        run: |
+          mkdir -p reports
+          # Image entrypoint is already "semgrep" — pass args only.
+          # --error → non-zero exit on ERROR severity (blocks the pipeline)
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ env.SEMGREP_IMAGE }} \
+            --config .semgrep/custom.yaml \
+            --error \
+            --metrics=off \
+            --json \
+            --output /src/reports/semgrep-report.json \
+            app
+
+      - name: Run Bandit
+        run: |
+          mkdir -p reports
+          # -lll = HIGH severity and above only (MEDIUM would be "unstable"/warn)
+          bandit -r app -lll -f json -o reports/bandit-report.json
+          bandit -r app -lll -f txt
+
+      - name: Upload SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-reports
+          path: |
+            reports/semgrep-report.json
+            reports/bandit-report.json
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 4. SCA — dependency vulnerabilities (blocking on CRITICAL/HIGH)
+  # ---------------------------------------------------------------------------
+  scan_dependencies:
+    name: "4 · SCA (Trivy FS + pip-audit)"
+    runs-on: ubuntu-latest
+    needs: install_and_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install app + pip-audit
+        run: |
+          pip install -r requirements.txt
+          pip install "pip-audit==2.6.1"
+
+      - name: pip-audit (blocking on known vulns)
+        run: |
+          mkdir -p reports
+          pip-audit -r requirements.txt --format json --output reports/pip-audit-report.json
+          pip-audit -r requirements.txt
+
+      - name: Trivy filesystem scan (CRITICAL/HIGH → fail)
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v trivy-cache:/root/.cache/ \
+            ${{ env.TRIVY_IMAGE }} \
+            fs --severity CRITICAL,HIGH \
+               --exit-code 1 \
+               --ignore-unfixed \
+               --format json \
+               --output /src/reports/trivy-fs-report.json \
+               /src
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v trivy-cache:/root/.cache/ \
+            ${{ env.TRIVY_IMAGE }} \
+            fs --severity CRITICAL,HIGH \
+               --exit-code 1 \
+               --ignore-unfixed \
+               --format table \
+               /src
+
+      - name: Upload SCA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-reports
+          path: |
+            reports/pip-audit-report.json
+            reports/trivy-fs-report.json
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 5. Docker build + image scan (blocking on CRITICAL/HIGH in image)
+  #     Runs on all branches so demo/vulnerable-image can fail here.
+  # ---------------------------------------------------------------------------
+  docker_build_scan:
+    name: "5 · Docker Build & Scan"
+    runs-on: ubuntu-latest
+    needs: [secrets_scan, sast, scan_dependencies]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      - name: Build Docker image
+
+      - name: Build image (load locally for scan)
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          tags: bensalahmohamedhedi19/devops:${{ github.sha }}
+          load: true
+          tags: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: bensalahmohamedhedi19/devops:${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-      
-      - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
 
-  deploy-vercel:
-    name: Deploy to Vercel
+      - name: Trivy image scan (CRITICAL/HIGH → fail)
+        run: |
+          mkdir -p reports
+          # Scan the image we just built. ignore-unfixed avoids blocking on
+          # OS CVEs with no available patch (still blocks fixable HIGH/CRITICAL).
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/src" \
+            -v trivy-cache:/root/.cache/ \
+            ${{ env.TRIVY_IMAGE }} \
+            image --severity CRITICAL,HIGH \
+                  --exit-code 1 \
+                  --ignore-unfixed \
+                  --format json \
+                  --output /src/reports/trivy-image-report.json \
+                  ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v trivy-cache:/root/.cache/ \
+            ${{ env.TRIVY_IMAGE }} \
+            image --severity CRITICAL,HIGH \
+                  --exit-code 1 \
+                  --ignore-unfixed \
+                  --format table \
+                  ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Upload Trivy image report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-report
+          path: reports/trivy-image-report.json
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 6. Push to Docker Hub (master only, only if credentials exist)
+  # ---------------------------------------------------------------------------
+  docker_push:
+    name: "6 · Docker Hub Push"
     runs-on: ubuntu-latest
-    needs: [security-scan, docker-build]
-    if: github.ref == 'refs/heads/master'
-    
+    needs: docker_build_scan
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Deploy to Vercel
+
+      - name: Check Docker Hub credentials
+        id: creds
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Docker Hub secrets not set — skipping push (demo still valid)."
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.creds.outputs.available == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: steps.creds.outputs.available == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.creds.outputs.available == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # 7. Deploy to Vercel (master only, only if credentials exist)
+  # ---------------------------------------------------------------------------
+  deploy_vercel:
+    name: "7 · Deploy Vercel"
+    runs-on: ubuntu-latest
+    needs: docker_build_scan
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Vercel credentials
+        id: creds
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Vercel secrets not set — skipping deploy."
+          fi
+
+      - name: Deploy to Vercel (production)
+        if: steps.creds.outputs.available == 'true'
         uses: amondnet/vercel-action@v25
+        id: vercel
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
-      
-      - name: Smoke test deployment
-        run: |
-          sleep 10
-          curl -f https://your-project-url.vercel.app/health || exit 1
-      
-      - name: Comment deployment status
-        uses: actions/github-script@v7
-        if: always()
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'Deployment completed! Status: ${{ job.status }}'
-            })
+          vercel-args: "--prod"
 
-  notify:
-    name: Send Notifications
-    runs-on: ubuntu-latest
-    needs: [security-scan, docker-build, deploy-vercel]
-    if: always()
-    
-    steps:
-      - name: Send email notification
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "DevSecOps Pipeline ${{ job.status }}"
-          to: ${{ secrets.NOTIFICATION_EMAIL }}
-          body: |
-            Pipeline: ${{ github.repository }}
-            Commit: ${{ github.sha }}
-            Status: ${{ job.status }}
-            Workflow: ${{ github.workflow }}
+      - name: Smoke test /health
+        if: steps.creds.outputs.available == 'true'
+        env:
+          VERCEL_URL: ${{ steps.vercel.outputs.preview-url }}
+        run: |
+          URL="${{ secrets.VERCEL_URL }}"
+          if [ -z "$URL" ]; then
+            URL="$VERCEL_URL"
+          fi
+          if [ -z "$URL" ]; then
+            echo "::warning::No VERCEL_URL secret and no action output — skip smoke test."
+            exit 0
+          fi
+          echo "Smoke testing $URL/health"
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$URL/health" | grep -q '"status"'; then
+              echo "Health check OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check failed"
+          exit 1
