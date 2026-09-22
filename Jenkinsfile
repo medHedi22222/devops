@@ -99,7 +99,7 @@ pipeline {
                         sh '''
                             mkdir -p ${REPORTS_DIR}
                             . venv/bin/activate
-                            semgrep --config .semgrep/custom.yaml --config auto --json --output ${REPORTS_DIR}/semgrep-report.json --metrics=off app || true
+                            semgrep --config .semgrep/custom.yaml --json --output ${REPORTS_DIR}/semgrep-report.json --metrics=off app || true
                         '''
                     }
                     post {
@@ -174,9 +174,9 @@ pipeline {
                 script {
                     // Parse Trivy output and fail on CRITICAL/HIGH
                     def trivyOutput = readFile("${REPORTS_DIR}/trivy-fs-report.json")
-                    def trivyJson = readJSON text: trivyOutput
-                    def criticalCount = trivyJson.Results.Results.sum { it.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0 }
-                    def highCount = trivyJson.Results.Results.sum { it.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0 }
+                    def trivyJson = new groovy.json.JsonSlurperClassic().parseText(trivyOutput)
+                    def criticalCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0 } ?: 0
+                    def highCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0 } ?: 0
                     
                     if (criticalCount > 0 || highCount > 0) {
                         error "Trivy found ${criticalCount} CRITICAL and ${highCount} HIGH vulnerabilities - blocking pipeline"
@@ -232,9 +232,9 @@ pipeline {
                 script {
                     // Parse Trivy output and fail on CRITICAL/HIGH
                     def trivyOutput = readFile("${REPORTS_DIR}/trivy-image-report.json")
-                    def trivyJson = readJSON text: trivyOutput
-                    def criticalCount = trivyJson.Results?.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0
-                    def highCount = trivyJson.Results?.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0
+                    def trivyJson = new groovy.json.JsonSlurperClassic().parseText(trivyOutput)
+                    def criticalCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'CRITICAL' } ?: 0 } ?: 0
+                    def highCount = trivyJson.Results?.sum { res -> res.Vulnerabilities?.count { it.Severity == 'HIGH' } ?: 0 } ?: 0
                     
                     if (criticalCount > 0 || highCount > 0) {
                         error "Trivy image scan found ${criticalCount} CRITICAL and ${highCount} HIGH vulnerabilities - blocking pipeline"
@@ -300,7 +300,7 @@ pipeline {
                 script {
                     // Parse ZAP output for HIGH severity issues
                     def zapOutput = readFile("${REPORTS_DIR}/zap-report.json")
-                    def zapJson = readJSON text: zapOutput
+                    def zapJson = new groovy.json.JsonSlurperClassic().parseText(zapOutput)
                     def highCount = zapJson.site?.find { it.'@alerts' }?.'@alerts'?.count { it.riskcode == '3' } ?: 0
                     
                     if (highCount > 0) {
