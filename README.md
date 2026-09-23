@@ -42,9 +42,7 @@ Workflow: [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml)
 | Secrets | Gitleaks | yes (any secret) |
 | SAST | Semgrep + Bandit | yes (ERROR / HIGH+) |
 | SCA | Trivy FS + pip-audit | yes (CRITICAL/HIGH) |
-| Docker build & scan | Trivy image | yes (CRITICAL/HIGH) |
-| Docker Hub push | docker | `master` only (if secrets set) |
-| Vercel deploy | Vercel CLI | `master` only (if secrets set) |
+| Deploy | Vercel GitHub integration | automatic after a push to `master` |
 
 Baseline (no security) for before/after comparison:
 [`.github/workflows/as-is.yml`](.github/workflows/as-is.yml) — run manually.
@@ -56,7 +54,6 @@ Baseline (no security) for before/after comparison:
 | `demo/leaked-secret` | Secrets (Gitleaks) |
 | `demo/insecure-code` | SAST |
 | `demo/vulnerable-dependency` | SCA |
-| `demo/vulnerable-image` | Docker scan |
 
 Never merge these into `master`.
 
