@@ -18,7 +18,7 @@ This project uses a **dual deployment strategy**:
    - Auto-scaling serverless infrastructure
    - Production URL for end users
 
-**Important**: These are two separate delivery targets from the same validated commit. The Docker image is the scanned container artifact, while Vercel runs the code serverlessly.
+**Important**: Vercel is deployed by the final GitHub Actions job only after tests and all security scans pass. Disable the Vercel project's automatic Git deployment, otherwise Vercel will still deploy immediately when the commit is pushed.
 
 ## Docker Hub Deployment
 
@@ -28,7 +28,7 @@ Images are tagged as:
 - `<dockerhub_user>/devsecops-flask:<git_sha_short>` - Immutable, specific to commit
 - `<dockerhub_user>/devsecops-flask:latest` - Mutable, points to latest main branch commit
 
-### Jenkins Pipeline Stage
+### GitHub Actions Pipeline Stage
 
 ```groovy
 stage('Docker Push') {
@@ -149,25 +149,11 @@ if os.environ.get('VERCEL'):
 ### Jenkins Pipeline Stage
 
 ```groovy
-stage('Deploy Vercel') {
-    when {
-        branch 'main'
-    }
-    steps {
-        withCredentials([string(credentialsId: 'vercel-token', ...), ...]) {
-            sh '''
-                npm install -g vercel
-                export VERCEL_ORG_ID=$VERCEL_ORG_ID
-                export VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID
-                vercel deploy --prod --yes --token=$VERCEL_TOKEN
-                
-                # Smoke test
-                DEPLOYMENT_URL=$(vercel ls --prod ...)
-                curl -f $DEPLOYMENT_URL/health || exit 1
-            '''
-        }
-    }
-}
+deploy_vercel:
+  needs: [install_and_test, secrets_scan, sast, scan_dependencies]
+  if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  steps:
+   - run: npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
 ```
 
 ### Manual Vercel Setup
@@ -188,6 +174,8 @@ stage('Deploy Vercel') {
    # Get IDs from .vercel/project.json
    cat .vercel/project.json
    ```
+4. **Disable automatic Git deployments** in the Vercel project settings.
+5. **Add these GitHub Actions secrets**: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
 4. **Create access token**:
    - Vercel dashboard → Settings → Tokens
    - Create new token with appropriate scope

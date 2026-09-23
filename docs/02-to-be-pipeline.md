@@ -15,24 +15,18 @@ graph TD
     C -->|secret| X
     D -->|ERROR/HIGH| X
     E -->|CRITICAL/HIGH| X
-    C --> F[5 Docker Build and Scan]
-    D --> F
-    E --> F
-    F -->|CRITICAL/HIGH| X
-    F -->|ok| G{Branch master?}
+    C --> G{Push to master?}
+    D --> G
+    E --> G
     G -->|non| H[Success - gates OK]
-    G -->|oui| I[6 Docker Hub push]
-    G -->|oui| J[7 Vercel deploy + smoke]
-    I --> K[Success]
-    J --> K
+    G -->|oui| I[5 Vercel deploy]
+    I --> J[Success]
 
     style X fill:#ff6b6b
     style H fill:#51cf66
-    style K fill:#51cf66
     style C fill:#ffd43b
     style D fill:#ffd43b
     style E fill:#ffd43b
-    style F fill:#ffd43b
 ```
 
 ## Stages et seuils
@@ -43,9 +37,7 @@ graph TD
 | 2 | Secrets | Gitleaks | oui (tout secret) |
 | 3 | SAST | Semgrep + Bandit | oui (ERROR / HIGH+) |
 | 4 | SCA | Trivy FS + pip-audit | oui (CRITICAL/HIGH) |
-| 5 | Docker build & scan | Trivy image | oui (CRITICAL/HIGH, ignore-unfixed) |
-| 6 | Docker Hub | docker login --password-stdin | master + secrets GH |
-| 7 | Vercel | vercel-action + curl /health | master + secrets GH |
+| 5 | Vercel | Vercel CLI | master + VERCEL secrets |
 
 Images de scanners **épinglées** (pas de `:latest`) : gitleaks, semgrep, trivy.
 
@@ -62,7 +54,7 @@ Voir [`DEMO_BRANCHES.md`](DEMO_BRANCHES.md) : chaque branche `demo/*` échoue au
 | SCA | non | Trivy + pip-audit |
 | Image | non | Trivy |
 | Qualité tests | optionnel | bloquant |
-| Déploiement | aveugle | après gates |
+| Déploiement | aveugle | après tous les gates |
 
 ## SonarQube
 

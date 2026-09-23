@@ -9,8 +9,8 @@
 #   2. secrets_scan         — Gitleaks                   [BLOCKING]
 #   3. sast                 — Semgrep + Bandit           [BLOCKING on ERROR/HIGH]
 #   4. scan_dependencies    — Trivy FS + pip-audit       [BLOCKING on CRITICAL/HIGH]
-# Deployment is handled by Vercel's GitHub integration on pushes to master.
-# Docker image jobs are intentionally not required. 
+# Deployment runs as the final job after every blocking check passes.
+# Automatic Vercel Git deployments must be disabled in the Vercel project.
 #
 # Demo branches (never merge to master):
 #   demo/leaked-secret          → fails at secrets_scan
@@ -238,3 +238,32 @@ jobs:
             reports/pip-audit-report.json
             reports/trivy-fs-report.json
           if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 5. Production deployment (only after every blocking check passes)
+  # ---------------------------------------------------------------------------
+  deploy_vercel:
+    name: "5 · Deploy to Vercel"
+    runs-on: ubuntu-latest
+    needs:
+      - install_and_test
+      - secrets_scan
+      - sast
+      - scan_dependencies
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
