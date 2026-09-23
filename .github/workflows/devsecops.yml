@@ -197,8 +197,17 @@ jobs:
       - name: pip-audit (blocking on known vulns)
         run: |
           mkdir -p reports
+          # Keep the JSON report and console details even when vulnerabilities
+          # make pip-audit return its expected non-zero status.
+          set +e
           pip-audit -r requirements.txt --format json --output reports/pip-audit-report.json
+          audit_status=$?
           pip-audit -r requirements.txt
+          table_status=$?
+          set -e
+          if [ "$audit_status" -ne 0 ] || [ "$table_status" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Trivy filesystem scan (CRITICAL/HIGH → fail)
         run: |

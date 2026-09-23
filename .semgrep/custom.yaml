@@ -116,7 +116,11 @@ rules:
         - python
 
   - id: weak-token-expiry
-    pattern: JWT_ACCESS_TOKEN_EXPIRES = $NUM
+    patterns:
+      - pattern: JWT_ACCESS_TOKEN_EXPIRES = $NUM
+      - metavariable-comparison:
+          metavariable: $NUM
+          comparison: $NUM < 900
     message: JWT token expiry time is too short (should be at least 900 seconds)
     severity: WARNING
     languages: [python]
