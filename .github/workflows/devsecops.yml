@@ -10,7 +10,7 @@
 #   3. sast                 — Semgrep + Bandit           [BLOCKING on ERROR/HIGH]
 #   4. scan_dependencies    — Trivy FS + pip-audit       [BLOCKING on CRITICAL/HIGH]
 # Deployment is handled by Vercel's GitHub integration on pushes to master.
-# Docker image jobs are intentionally not required.
+# Docker image jobs are intentionally not required. 
 #
 # Demo branches (never merge to master):
 #   demo/leaked-secret          → fails at secrets_scan
