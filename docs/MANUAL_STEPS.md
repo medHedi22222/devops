@@ -14,7 +14,7 @@ Un push sur `master` propre doit déjà passer au vert.
 
 | Secret | Valeur |
 |--------|--------|
-| `DOCKERHUB_USERNAME` | votre user Docker Hub |
+| `DOCKERHUB_USERNAME` | votre user Docker Hub  |
 | `DOCKERHUB_TOKEN` | Access Token (Account Settings → Security) |
 
 Sans ces secrets, le job **skip** le push (notice dans les logs) — le pipeline reste vert.
