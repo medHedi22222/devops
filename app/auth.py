@@ -2,21 +2,46 @@
 Authentication routes and logic.
 """
 
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, redirect, url_for, make_response
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, set_access_cookies
 from .models import db, User
 from .config import Config
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
-@auth_bp.route('/register', methods=['POST'])
+@auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     """
     Register a new user.
-    Expects JSON: {username, email, password}
+    GET: Returns HTML form for registration
+    POST: Expects JSON: {username, email, password}
     """
+    if request.method == 'GET':
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head><title>Register</title></head>
+        <body>
+            <h1>Register</h1>
+            <form method="POST" action="/auth/register">
+                <label for="username">Username:</label><br>
+                <input type="text" id="username" name="username"><br>
+                <label for="email">Email:</label><br>
+                <input type="email" id="email" name="email"><br>
+                <label for="password">Password:</label><br>
+                <input type="password" id="password" name="password"><br><br>
+                <input type="submit" value="Register">
+            </form>
+            <p>Already have an account? <a href="/auth/login">Login here</a></p>
+        </body>
+        </html>
+        '''
     try:
-        data = request.get_json()
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
         
         # Validate input
         if not data or not all(k in data for k in ('username', 'email', 'password')):
@@ -47,23 +72,54 @@ def register():
         db.session.add(user)
         db.session.commit()
         
-        return jsonify({
-            'message': 'User registered successfully',
-            'user': user.to_dict()
-        }), 201
+        # Return JSON for API calls, redirect for form submissions
+        if request.is_json:
+            return jsonify({
+                'message': 'User registered successfully',
+                'user': user.to_dict()
+            }), 201
+        else:
+            # Create token and set in cookie for form submissions
+            access_token = create_access_token(identity=str(user.id))
+            response = make_response(redirect(url_for('auth.welcome', username=username)))
+            set_access_cookies(response, access_token)
+            return response
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 500
 
-@auth_bp.route('/login', methods=['POST'])
+@auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """
     Login user and return JWT access token.
-    Expects JSON: {username, password}
+    GET: Returns HTML form for login
+    POST: Expects JSON: {username, password}
     """
+    if request.method == 'GET':
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head><title>Login</title></head>
+        <body>
+            <h1>Login</h1>
+            <form method="POST" action="/auth/login">
+                <label for="username">Username:</label><br>
+                <input type="text" id="username" name="username"><br>
+                <label for="password">Password:</label><br>
+                <input type="password" id="password" name="password"><br><br>
+                <input type="submit" value="Login">
+            </form>
+            <p>Don't have an account? <a href="/auth/register">Register here</a></p>
+        </body>
+        </html>
+        '''
     try:
-        data = request.get_json()
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
         
         # Validate input
         if not data or not all(k in data for k in ('username', 'password')):
@@ -81,13 +137,46 @@ def login():
         # Create access token (identity must be a string)
         access_token = create_access_token(identity=str(user.id))
         
-        return jsonify({
-            'access_token': access_token,
-            'user': user.to_dict()
-        }), 200
+        # Return JSON for API calls, redirect for form submissions
+        if request.is_json:
+            return jsonify({
+                'access_token': access_token,
+                'user': user.to_dict()
+            }), 200
+        else:
+            # Set token in cookie for form submissions
+            response = make_response(redirect(url_for('auth.welcome', username=username)))
+            set_access_cookies(response, access_token)
+            return response
         
     except Exception as e:
         return jsonify({'error': 'Login failed'}), 500
+
+@auth_bp.route('/welcome/<username>')
+def welcome(username):
+    """
+    Welcome page after successful login/registration.
+    """
+    return f'''
+    <!DOCTYPE html>
+    <html>
+    <head><title>Welcome</title></head>
+    <body>
+        <h1>Hello, {username}!</h1>
+        <p>You have successfully logged in.</p>
+        <a href="/auth/logout">Logout</a>
+    </body>
+    </html>
+    '''
+
+@auth_bp.route('/logout')
+def logout():
+    """
+    Logout user and redirect to login page.
+    """
+    response = make_response(redirect(url_for('auth.login')))
+    unset_jwt_cookies(response)
+    return response
 
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
