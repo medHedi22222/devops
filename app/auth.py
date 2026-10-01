@@ -2,7 +2,8 @@
 Authentication routes and logic.
 """
 
-from flask import Blueprint, request, jsonify, redirect, url_for, make_response, escape
+from flask import Blueprint, request, jsonify, redirect, url_for, make_response
+from markupsafe import escape
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, set_access_cookies
 from .models import db, User
 from .config import Config
