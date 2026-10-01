@@ -309,8 +309,8 @@ jobs:
         run: |
           mkdir -p reports
           docker run --rm \
-            -v "$PWD:/src" \
-            -w /src \
+            -v "$PWD:/zap/wrk" \
+            -w /zap/wrk \
             --network host \
             ${{ env.ZAP_IMAGE }} \
             zap-baseline.py \
