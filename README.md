@@ -42,6 +42,7 @@ Workflow: [`.github/workflows/devsecops.yml`](.github/workflows/devsecops.yml)
 | Secrets | Gitleaks | yes (any secret) |
 | SAST | Semgrep + Bandit | yes (ERROR / HIGH+) |
 | SCA | Trivy FS + pip-audit | yes (CRITICAL/HIGH) |
+| DAST | OWASP ZAP | yes (HIGH/CRITICAL) |
 | Deploy | Vercel GitHub integration | automatic after a push to `master` |
 
 Baseline (no security) for before/after comparison:

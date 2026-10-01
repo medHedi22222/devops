@@ -1,4 +1,4 @@
-.PHONY: help test scan scan-local clean
+.PHONY: help test scan scan-local dast-local clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -19,6 +19,12 @@ scan-local: ## Run all security scans locally
 	@echo "Running Trivy filesystem scan..."
 	trivy fs --format json --output reports/trivy-fs-report.json . || true
 	@echo "Security scans completed. Check reports/ directory."
+
+dast-local: ## Run DAST scan locally with OWASP ZAP (requires app running on localhost:5000)
+	@echo "Running OWASP ZAP DAST scan..."
+	@echo "Make sure the Flask app is running on http://localhost:5000"
+	docker run --rm -v "$$PWD:/zap/wrk" -t zaproxy/zap-stable:2.15.0 zap-baseline.py -t http://localhost:5000 -r reports/zap-report.html -x reports/zap-report.xml --alertLevel HIGH --no-progress || true
+	@echo "DAST scan completed. Check reports/zap-report.html"
 
 clean: ## Clean up generated files
 	rm -rf reports/*
