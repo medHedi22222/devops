@@ -268,7 +268,7 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   # ---------------------------------------------------------------------------
-  # 6. DAST — OWASP ZAP dynamic security scan (non-blocking for now)
+  # 6. DAST — OWASP ZAP dynamic security scan (blocking on HIGH/CRITICAL)
   # ---------------------------------------------------------------------------
   dast:
     name: "6 · DAST (OWASP ZAP)"
@@ -279,7 +279,6 @@ jobs:
       - sast
       - scan_dependencies
       - sonarqube
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -329,7 +328,8 @@ jobs:
               -x reports/zap-report.xml \
               -I \
               -l WARN \
-              -T 10
+              -T 10 \
+              -m 1
 
       - name: Stop Flask application
         if: always()
