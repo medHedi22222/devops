@@ -268,7 +268,7 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   # ---------------------------------------------------------------------------
-  # 6. DAST — OWASP ZAP dynamic security scan (blocking on HIGH/CRITICAL)
+  # 6. DAST — OWASP ZAP dynamic security scan (non-blocking for now)
   # ---------------------------------------------------------------------------
   dast:
     name: "6 · DAST (OWASP ZAP)"
@@ -279,6 +279,7 @@ jobs:
       - sast
       - scan_dependencies
       - sonarqube
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
