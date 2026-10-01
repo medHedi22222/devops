@@ -2,7 +2,7 @@
 Authentication routes and logic.
 """
 
-from flask import Blueprint, request, jsonify, redirect, url_for, make_response
+from flask import Blueprint, request, jsonify, redirect, url_for, make_response, escape
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, set_access_cookies
 from .models import db, User
 from .config import Config
@@ -157,12 +157,13 @@ def welcome(username):
     """
     Welcome page after successful login/registration.
     """
+    safe_username = escape(username)
     return f'''
     <!DOCTYPE html>
     <html>
     <head><title>Welcome</title></head>
     <body>
-        <h1>Hello, {username}!</h1>
+        <h1>Hello, {safe_username}!</h1>
         <p>You have successfully logged in.</p>
         <a href="/auth/logout">Logout</a>
     </body>

@@ -210,3 +210,46 @@ def test_get_current_user_without_token(client):
     """Test /auth/me endpoint without JWT token."""
     response = client.get('/auth/me')
     assert response.status_code == 401
+
+def test_register_get_endpoint(client):
+    """Test GET request to register endpoint returns HTML form."""
+    response = client.get('/auth/register')
+    assert response.status_code == 200
+    assert b'Register' in response.data
+    assert b'form' in response.data
+
+def test_login_get_endpoint(client):
+    """Test GET request to login endpoint returns HTML form."""
+    response = client.get('/auth/login')
+    assert response.status_code == 200
+    assert b'Login' in response.data
+    assert b'form' in response.data
+
+def test_register_with_form_data(client):
+    """Test registration with form data (non-JSON)."""
+    response = client.post('/auth/register', data={
+        'username': 'formuser',
+        'email': 'formuser@example.com',
+        'password': 'SecurePassword123'
+    })
+    assert response.status_code == 302  # Redirect on success
+
+def test_login_with_form_data(client, test_user):
+    """Test login with form data (non-JSON)."""
+    response = client.post('/auth/login', data={
+        'username': 'testuser',
+        'password': 'TestPassword123'
+    })
+    assert response.status_code == 302  # Redirect on success
+
+def test_welcome_endpoint(client):
+    """Test welcome endpoint."""
+    response = client.get('/auth/welcome/testuser')
+    assert response.status_code == 200
+    assert b'Hello, testuser!' in response.data
+
+def test_logout_endpoint(client):
+    """Test logout endpoint."""
+    response = client.get('/auth/logout', follow_redirects=True)
+    assert response.status_code == 200
+    assert b'Login' in response.data
