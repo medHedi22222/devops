@@ -23,7 +23,7 @@ scan-local: ## Run all security scans locally
 dast-local: ## Run DAST scan locally with OWASP ZAP (requires app running on localhost:5000)
 	@echo "Running OWASP ZAP DAST scan..."
 	@echo "Make sure the Flask app is running on http://localhost:5000"
-	docker run --rm -v "$$PWD:/zap/wrk" -t zaproxy/zap-stable:2.15.0 zap-baseline.py -t http://localhost:5000 -r reports/zap-report.html -x reports/zap-report.xml --alertLevel HIGH --no-progress || true
+	docker run --rm -v "$$PWD:/zap/wrk" -t zaproxy/zap-stable:2.15.0 zap-baseline.py -t http://localhost:5000 -r reports/zap-report.html -x reports/zap-report.xml -I -l WARN || true
 	@echo "DAST scan completed. Check reports/zap-report.html"
 
 clean: ## Clean up generated files

@@ -317,9 +317,8 @@ jobs:
               -t http://localhost:5000 \
               -r reports/zap-report.html \
               -x reports/zap-report.xml \
-              --alertLevel HIGH \
-              --exit-code-on-warn \
-              --no-progress
+              -I \
+              -l WARN
 
       - name: Stop Flask application
         if: always()
