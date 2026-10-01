@@ -299,11 +299,20 @@ jobs:
           JWT_SECRET_KEY: test-jwt-secret-key-for-dast-32bytes!!
           JWT_ACCESS_TOKEN_EXPIRES: "900"
         run: |
-          python wsgi.py &
+          python wsgi.py > app.log 2>&1 &
           APP_PID=$!
           echo "APP_PID=$APP_PID" >> $GITHUB_ENV
           echo "Waiting for app to start..."
-          sleep 10
+          sleep 15
+          # Check if app is running
+          if ! kill -0 $APP_PID 2>/dev/null; then
+            echo "App failed to start. Log:"
+            cat app.log
+            exit 1
+          fi
+          # Health check
+          curl -f http://localhost:5000/health || exit 1
+          echo "App is ready for scanning"
 
       - name: Run OWASP ZAP baseline scan
         run: |
@@ -318,7 +327,8 @@ jobs:
               -r reports/zap-report.html \
               -x reports/zap-report.xml \
               -I \
-              -l WARN
+              -l WARN \
+              -T 10
 
       - name: Stop Flask application
         if: always()
