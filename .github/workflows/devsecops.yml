@@ -82,6 +82,28 @@ jobs:
           path: reports/
           if-no-files-found: ignore
 
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: Install & Test
+            
+            Please check the GitHub Actions logs for details.
+
   # ---------------------------------------------------------------------------
   # 2. Secrets scanning with Gitleaks (blocking — any finding fails the job)
   # ---------------------------------------------------------------------------
@@ -117,6 +139,28 @@ jobs:
           name: gitleaks-report
           path: reports/gitleaks-report.json
           if-no-files-found: ignore
+
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: Secrets Scan (Gitleaks)
+            
+            Secrets were detected in your code. Please check the Gitleaks report.
 
   # ---------------------------------------------------------------------------
   # 3. SAST — Semgrep + Bandit (blocking on high/error findings)
@@ -171,6 +215,28 @@ jobs:
             reports/semgrep-report.json
             reports/bandit-report.json
           if-no-files-found: ignore
+
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: SAST (Semgrep + Bandit)
+            
+            Security vulnerabilities were detected in your code. Please check the SAST reports.
 
   # ---------------------------------------------------------------------------
   # 4. SCA — dependency vulnerabilities (blocking on CRITICAL/HIGH)
@@ -242,6 +308,28 @@ jobs:
             reports/trivy-fs-report.json
           if-no-files-found: ignore
 
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: SCA (Trivy + pip-audit)
+            
+            Vulnerable dependencies were detected. Please check the SCA reports.
+
   # ---------------------------------------------------------------------------
   # 5. SonarQube Code Quality & SAST Scan
   # ---------------------------------------------------------------------------
@@ -266,6 +354,28 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: SonarQube Analysis
+            
+            Code quality gate failed. Please check SonarQube for details.
 
   # ---------------------------------------------------------------------------
   # 6. DAST — OWASP ZAP dynamic security scan (blocking on HIGH/CRITICAL)
@@ -366,6 +476,28 @@ jobs:
           path: reports/dast-report.txt
           if-no-files-found: ignore
 
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: DAST (Security Headers Check)
+            
+            Dynamic security scan failed. Please check the DAST report.
+
   # ---------------------------------------------------------------------------
   # 7. Production deployment (only after every blocking check passes)
   # ---------------------------------------------------------------------------
@@ -396,4 +528,31 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
+
+      - name: Send success notification
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ Deployment Successful - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your application has been successfully deployed to Vercel!
+            
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            
+            All security checks passed:
+            - ✅ Tests passed
+            - ✅ Secrets scan passed
+            - ✅ SAST passed
+            - ✅ SCA passed
+            - ✅ SonarQube passed
+            - ✅ DAST passed
 
