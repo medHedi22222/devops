@@ -103,6 +103,7 @@ jobs:
             Failed Job: Install & Test
             
             Please check the GitHub Actions logs for details.
+          attachments: reports/pytest.xml,reports/coverage.xml
 
   # ---------------------------------------------------------------------------
   # 2. Secrets scanning with Gitleaks (blocking — any finding fails the job)
@@ -161,6 +162,7 @@ jobs:
             Failed Job: Secrets Scan (Gitleaks)
             
             Secrets were detected in your code. Please check the Gitleaks report.
+          attachments: reports/gitleaks-report.json
 
   # ---------------------------------------------------------------------------
   # 3. SAST — Semgrep + Bandit (blocking on high/error findings)
@@ -237,6 +239,7 @@ jobs:
             Failed Job: SAST (Semgrep + Bandit)
             
             Security vulnerabilities were detected in your code. Please check the SAST reports.
+          attachments: reports/semgrep-report.json,reports/bandit-report.json
 
   # ---------------------------------------------------------------------------
   # 4. SCA — dependency vulnerabilities (blocking on CRITICAL/HIGH)
@@ -329,6 +332,7 @@ jobs:
             Failed Job: SCA (Trivy + pip-audit)
             
             Vulnerable dependencies were detected. Please check the SCA reports.
+          attachments: reports/pip-audit-report.json,reports/trivy-fs-report.json
 
   # ---------------------------------------------------------------------------
   # 5. SonarQube Code Quality & SAST Scan
@@ -497,6 +501,7 @@ jobs:
             Failed Job: DAST (Security Headers Check)
             
             Dynamic security scan failed. Please check the DAST report.
+          attachments: reports/dast-report.txt
 
   # ---------------------------------------------------------------------------
   # 7. Production deployment (only after every blocking check passes)
@@ -529,6 +534,12 @@ jobs:
         run: |
           npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
 
+      - name: Download all reports
+        if: success()
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports/
+
       - name: Send success notification
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -555,4 +566,7 @@ jobs:
             - ✅ SCA passed
             - ✅ SonarQube passed
             - ✅ DAST passed
+            
+            All reports are attached to this email.
+          attachments: all-reports/**/*.json,all-reports/**/*.xml,all-reports/**/*.txt
 
