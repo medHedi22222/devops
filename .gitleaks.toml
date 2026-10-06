@@ -28,6 +28,7 @@ description = "Global allowlist for known false positives (placeholders only)"
 # otherwise the leaked-secret demo would never fail.
 paths = [
   '''tests/''',
+  '''docs/.*\.md$''',
   '''\.test\.py$''',
   '''\.example$''',
   '''\.example\.[a-z]+$''',
