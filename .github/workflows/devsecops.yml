@@ -77,8 +77,8 @@ jobs:
           JWT_ACCESS_TOKEN_EXPIRES: "900"                       # Token expires in 15 min
         run: |
           mkdir -p reports              # Create reports directory
-          pytest --cov=app --cov-report=xml:reports/coverage.xml \  # Generate XML coverage
-                 --cov-report=term-missing --junitxml=reports/pytest.xml -q  # Terminal output + JUnit
+          pytest --cov=app --cov-report=xml:reports/coverage.xml \
+                 --cov-report=term-missing --junitxml=reports/pytest.xml -q
 
       - name: Upload test reports         # Step 5: Save test results as artifacts
         if: always()                      # Run even if tests fail
@@ -128,16 +128,16 @@ jobs:
           # --no-git scans the working tree (current branch files).
           # This catches demo/leaked-secret and avoids false fails from old
           # example strings that may still exist deeper in git history.
-          docker run --rm \                # Run Docker container, remove after
-            -v "$PWD:/src" \              # Mount current dir to /src in container
-            -w /src \                      # Set working dir to /src
-            ${{ env.GITLEAKS_IMAGE }} \    # Use Gitleaks image from env var
-            detect --source /src \         # Scan /src directory
-                   --no-git \            # Don't scan git history, only current files
-                   --config /src/.gitleaks.toml \  # Use custom config
-                   --report-path /src/reports/gitleaks-report.json \  # Output file
-                   --report-format json \  # JSON format
-                   --verbose               # Show detailed output
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ env.GITLEAKS_IMAGE }} \
+            detect --source /src \
+                   --no-git \
+                   --config /src/.gitleaks.toml \
+                   --report-path /src/reports/gitleaks-report.json \
+                   --report-format json \
+                   --verbose
 
       - name: Upload Gitleaks report       # Step 3: Save report as artifact
         if: always()                      # Run even if scan fails
@@ -195,17 +195,17 @@ jobs:
           mkdir -p reports                 # Create reports dir
           # Invoke Semgrep explicitly; this image version has no semgrep entrypoint.
           # --error → non-zero exit on ERROR severity (blocks the pipeline)
-          docker run --rm \                # Run Docker, remove after
-            -v "$PWD:/src" \              # Mount current dir
-            -w /src \                      # Working dir
-            ${{ env.SEMGREP_IMAGE }} \    # Use Semgrep image
-            semgrep \                      # Run semgrep command
-            --config .semgrep/custom.yaml \  # Use custom rules
-            --error \                      # Fail on ERROR severity
-            --metrics=off \                # Disable metrics
-            --json \                       # JSON output
-            --output /src/reports/semgrep-report.json \  # Output file
-            app                            # Scan app directory
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            ${{ env.SEMGREP_IMAGE }} \
+            semgrep \
+            --config .semgrep/custom.yaml \
+            --error \
+            --metrics=off \
+            --json \
+            --output /src/reports/semgrep-report.json \
+            app
 
       - name: Run Bandit                   # Step 5: Run Bandit SAST
         run: |
@@ -287,24 +287,24 @@ jobs:
       - name: Trivy filesystem scan (CRITICAL/HIGH → fail)  # Step 5: Scan files
         run: |
           mkdir -p reports                     # Create reports dir
-          docker run --rm \                    # Run Docker, remove after
-            -v "$PWD:/src" \                  # Mount current dir
-            -v trivy-cache:/root/.cache/ \     # Cache for speed
-            ${{ env.TRIVY_IMAGE }} \          # Use Trivy image
-            fs --severity CRITICAL,HIGH \      # Only CRITICAL and HIGH
-               --exit-code 1 \                # Exit 1 if vulnerabilities found
-               --ignore-unfixed \             # Ignore unfixed vulnerabilities
-               --format json \                # JSON output
-               --output /src/reports/trivy-fs-report.json \  # Output file
-               /src                            # Scan /src directory
-          docker run --rm \                    # Second run for table output
+          docker run --rm \
             -v "$PWD:/src" \
             -v trivy-cache:/root/.cache/ \
             ${{ env.TRIVY_IMAGE }} \
             fs --severity CRITICAL,HIGH \
                --exit-code 1 \
                --ignore-unfixed \
-               --format table \                # Table format for console
+               --format json \
+               --output /src/reports/trivy-fs-report.json \
+               /src
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v trivy-cache:/root/.cache/ \
+            ${{ env.TRIVY_IMAGE }} \
+            fs --severity CRITICAL,HIGH \
+               --exit-code 1 \
+               --ignore-unfixed \
+               --format table \
                /src
 
       - name: Upload SCA reports             # Step 6: Save reports
