@@ -7,10 +7,10 @@ Implémentation : [`.github/workflows/as-is.yml`](../.github/workflows/as-is.yml
 
 ## Étapes
 
-1. **Checkout** — git  
-2. **Install** — pip (aucune vérif d’intégrité / CVE)  
-3. **Unit tests** — pytest (pas de gate sécurité)  
-4. **« Deploy »** — simulé, sans scan d’image ni secrets  
+1. **Checkout** — git
+2. **Install** — pip (aucune vérif d’intégrité / CVE)
+3. **Unit tests** — pytest (pas de gate sécurité)
+4. **« Deploy »** — simulé, sans scan d’image ni secrets
 
 ## Faiblesses (pourquoi ce n’est pas acceptable)
 

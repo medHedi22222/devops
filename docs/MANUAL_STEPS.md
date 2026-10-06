@@ -53,8 +53,8 @@ git push origin master
 
 Puis dans **Actions**, montrer :
 
-1. `master` → tous les jobs verts  
-2. chaque `demo/*` → échec au job attendu  
+1. `master` → tous les jobs verts
+2. chaque `demo/*` → échec au job attendu
 
 ## 4. SonarQube local (optionnel)
 
@@ -68,5 +68,5 @@ Pas branché à la CI cloud (pas de Jenkins). Utile pour SonarLint en local.
 
 ## 5. Captures d’écran pour le rapport
 
-Pour chaque démo : run GitHub Actions rouge + rapport artifact.  
+Pour chaque démo : run GitHub Actions rouge + rapport artifact.
 Pour `master` : run vert + (si configuré) image Docker Hub + `/health` Vercel.

@@ -167,10 +167,10 @@ deploy_vercel:
    ```bash
    # Install Vercel CLI
    npm install -g vercel
-   
+
    # Link project
    vercel link
-   
+
    # Get IDs from .vercel/project.json
    cat .vercel/project.json
    ```

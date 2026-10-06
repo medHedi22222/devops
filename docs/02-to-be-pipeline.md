@@ -1,6 +1,6 @@
 # Pipeline To-Be (après DevSecOps)
 
-Pipeline sécurisé sur **GitHub Actions** (Jenkins retiré).  
+Pipeline sécurisé sur **GitHub Actions** (Jenkins retiré).
 Fichier : [`.github/workflows/devsecops.yml`](../.github/workflows/devsecops.yml)
 
 ## Diagramme

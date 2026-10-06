@@ -15,9 +15,9 @@ without local Jenkins/Docker Hub pull issues; same DevSecOps gates for the demo.
 
 ## What you must do
 
-1. Push `master` + `demo/*` branches  
-2. Open **Actions** and verify green/red as in `docs/DEMO_BRANCHES.md`  
-3. Optionally add Docker Hub / Vercel secrets (`docs/MANUAL_STEPS.md`)  
+1. Push `master` + `demo/*` branches
+2. Open **Actions** and verify green/red as in `docs/DEMO_BRANCHES.md`
+3. Optionally add Docker Hub / Vercel secrets (`docs/MANUAL_STEPS.md`)
 4. Screenshots for `docs/REPORT.md`
 
 ## Definition of demo success

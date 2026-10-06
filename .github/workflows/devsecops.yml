@@ -9,9 +9,10 @@
 #   2. secrets_scan         — Gitleaks                   [BLOCKING]
 #   3. sast                 — Semgrep + Bandit           [BLOCKING on ERROR/HIGH]
 #   4. scan_dependencies    — Trivy FS + pip-audit       [BLOCKING on CRITICAL/HIGH]
-#   5. sonarqube            — SonarQube Code Analysis    [QUALITY GATE]
-#   6. dast                 — OWASP ZAP DAST scan        [BLOCKING on HIGH/CRITICAL]
-#   7. deploy_vercel        — Production deployment      [FINAL]
+#   5. generate_sbom        — Syft SBOM generation       [NON-BLOCKING]
+#   6. sonarqube            — SonarQube Code Analysis    [QUALITY GATE]
+#   7. dast                 — Security Headers Check      [BLOCKING]
+#   8. deploy_vercel        — Production deployment      [FINAL]
 # Automatic Vercel Git deployments must be disabled in the Vercel project.
 #
 # Demo branches (never merge to master):
@@ -20,128 +21,133 @@
 #   demo/vulnerable-dependency  → fails at scan_dependencies
 # =============================================================================
 
+# Workflow name displayed in GitHub Actions UI
 name: DevSecOps Pipeline
 
+# Triggers: when to run the workflow
 on:
   push:
-    branches: [master, "demo/**"]
+    branches: [master, "demo/**"]  # Run on push to master or any demo/* branch
   pull_request:
-    branches: [master]
-  workflow_dispatch:
+    branches: [master]              # Run on PR to master
+  workflow_dispatch:                # Allow manual trigger from GitHub UI
 
+# Environment variables available to all jobs
 env:
-  PYTHON_VERSION: "3.11"
-  # Pinned scanner images (no :latest)
-  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.18.4
-  SEMGREP_IMAGE: semgrep/semgrep:1.45.0
-  TRIVY_IMAGE: aquasec/trivy:0.50.1
-  ZAP_IMAGE: zaproxy/zap-stable:2.15.0
+  PYTHON_VERSION: "3.11"           # Python version to use
+  # Pinned scanner images (no :latest) - ensures reproducibility
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.18.4  # Secrets scanner
+  SEMGREP_IMAGE: semgrep/semgrep:1.45.0        # SAST scanner
+  TRIVY_IMAGE: aquasec/trivy:0.50.1            # Vulnerability scanner
+  ZAP_IMAGE: zaproxy/zap-stable:2.15.0         # DAST scanner
 
+# GitHub Actions permissions
 permissions:
-  contents: read
-  security-events: write
-  actions: read
+  contents: read          # Read repository code
+  security-events: write  # Write security alerts to GitHub
+  actions: read           # Read GitHub Actions data
 
+# Define jobs (each job runs in parallel unless dependencies specified)
 jobs:
   # ---------------------------------------------------------------------------
   # 1. Install dependencies and run unit tests (blocking)
   # ---------------------------------------------------------------------------
   install_and_test:
-    name: "1 · Install & Test"
-    runs-on: ubuntu-latest
+    name: "1 · Install & Test"           # Display name in UI
+    runs-on: ubuntu-latest               # Runner OS
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout                  # Step 1: Get code from repo
+        uses: actions/checkout@v4       # GitHub action to clone repo
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python              # Step 2: Install Python
+        uses: actions/setup-python@v5   # GitHub action to setup Python
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          python-version: ${{ env.PYTHON_VERSION }}  # Use version from env var
+          cache: pip                      # Cache pip packages for speed
 
-      - name: Install dependencies
+      - name: Install dependencies       # Step 3: Install Python packages
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install --upgrade pip  # Upgrade pip to latest
+          pip install -r requirements.txt -r requirements-dev.txt  # Install all dependencies
 
-      - name: Run pytest with coverage
+      - name: Run pytest with coverage    # Step 4: Run tests with coverage
         env:
-          SECRET_KEY: test-secret-key-for-ci-must-be-32b
-          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-32bytes!!
-          JWT_ACCESS_TOKEN_EXPIRES: "900"
+          SECRET_KEY: test-secret-key-for-ci-must-be-32b        # Flask secret for CI
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-32bytes!!  # JWT secret for CI
+          JWT_ACCESS_TOKEN_EXPIRES: "900"                       # Token expires in 15 min
         run: |
-          mkdir -p reports
-          pytest --cov=app --cov-report=xml:reports/coverage.xml \
-                 --cov-report=term-missing --junitxml=reports/pytest.xml -q
+          mkdir -p reports              # Create reports directory
+          pytest --cov=app --cov-report=xml:reports/coverage.xml \  # Generate XML coverage
+                 --cov-report=term-missing --junitxml=reports/pytest.xml -q  # Terminal output + JUnit
 
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload test reports         # Step 5: Save test results as artifacts
+        if: always()                      # Run even if tests fail
+        uses: actions/upload-artifact@v4  # GitHub action to upload files
         with:
-          name: test-reports
-          path: reports/
-          if-no-files-found: ignore
+          name: test-reports              # Artifact name
+          path: reports/                  # Directory to upload
+          if-no-files-found: ignore       # Don't fail if no files
 
-      - name: Send failure notification
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
+      - name: Send failure notification   # Step 6: Email if tests fail
+        if: failure()                     # Only run if job fails
+        uses: dawidd6/action-send-mail@v3 # Email action
         with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
+          server_address: smtp.gmail.com   # Gmail SMTP server
+          server_port: 465                 # SSL port
+          username: ${{ secrets.MAIL_USERNAME }}  # From GitHub secrets
+          password: ${{ secrets.MAIL_PASSWORD }}  # App password from secrets
           subject: "❌ Pipeline Failed - DevSecOps Pipeline"
-          to: ${{ secrets.MAIL_TO }}
-          from: DevSecOps Pipeline
+          to: ${{ secrets.MAIL_TO }}      # Recipient email from secrets
+          from: DevSecOps Pipeline         # Sender name
           body: |
             Your DevSecOps pipeline has failed!
-            
-            Repository: ${{ github.repository }}
-            Branch: ${{ github.ref }}
-            Commit: ${{ github.sha }}
-            Actor: ${{ github.actor }}
+
+            Repository: ${{ github.repository }}  # Repo name
+            Branch: ${{ github.ref }}              # Branch name
+            Commit: ${{ github.sha }}              # Commit hash
+            Actor: ${{ github.actor }}              # Who triggered
             Failed Job: Install & Test
-            
+
             Please check the GitHub Actions logs for details.
-          attachments: reports/pytest.xml,reports/coverage.xml
+          attachments: reports/pytest.xml,reports/coverage.xml  # Attach reports
 
   # ---------------------------------------------------------------------------
   # 2. Secrets scanning with Gitleaks (blocking — any finding fails the job)
   # ---------------------------------------------------------------------------
   secrets_scan:
-    name: "2 · Secrets Scan (Gitleaks)"
-    runs-on: ubuntu-latest
-    needs: install_and_test
+    name: "2 · Secrets Scan (Gitleaks)"  # Display name
+    runs-on: ubuntu-latest                 # Runner OS
+    needs: install_and_test                # Wait for job 1 to complete first
     steps:
-      - name: Checkout
+      - name: Checkout                    # Step 1: Get code
         uses: actions/checkout@v4
 
-      - name: Run Gitleaks
+      - name: Run Gitleaks                 # Step 2: Scan for secrets
         run: |
-          mkdir -p reports
+          mkdir -p reports                 # Create reports dir
           # --no-git scans the working tree (current branch files).
           # This catches demo/leaked-secret and avoids false fails from old
           # example strings that may still exist deeper in git history.
-          docker run --rm \
-            -v "$PWD:/src" \
-            -w /src \
-            ${{ env.GITLEAKS_IMAGE }} \
-            detect --source /src \
-                   --no-git \
-                   --config /src/.gitleaks.toml \
-                   --report-path /src/reports/gitleaks-report.json \
-                   --report-format json \
-                   --verbose
+          docker run --rm \                # Run Docker container, remove after
+            -v "$PWD:/src" \              # Mount current dir to /src in container
+            -w /src \                      # Set working dir to /src
+            ${{ env.GITLEAKS_IMAGE }} \    # Use Gitleaks image from env var
+            detect --source /src \         # Scan /src directory
+                   --no-git \            # Don't scan git history, only current files
+                   --config /src/.gitleaks.toml \  # Use custom config
+                   --report-path /src/reports/gitleaks-report.json \  # Output file
+                   --report-format json \  # JSON format
+                   --verbose               # Show detailed output
 
-      - name: Upload Gitleaks report
-        if: always()
+      - name: Upload Gitleaks report       # Step 3: Save report as artifact
+        if: always()                      # Run even if scan fails
         uses: actions/upload-artifact@v4
         with:
-          name: gitleaks-report
-          path: reports/gitleaks-report.json
-          if-no-files-found: ignore
+          name: gitleaks-report           # Artifact name
+          path: reports/gitleaks-report.json  # Report file
+          if-no-files-found: ignore       # Don't fail if no file
 
-      - name: Send failure notification
+      - name: Send failure notification   # Step 4: Email if secrets found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -154,13 +160,13 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your DevSecOps pipeline has failed!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
             Failed Job: Secrets Scan (Gitleaks)
-            
+
             Secrets were detected in your code. Please check the Gitleaks report.
           attachments: reports/gitleaks-report.json
 
@@ -168,47 +174,47 @@ jobs:
   # 3. SAST — Semgrep + Bandit (blocking on high/error findings)
   # ---------------------------------------------------------------------------
   sast:
-    name: "3 · SAST (Semgrep + Bandit)"
-    runs-on: ubuntu-latest
-    needs: install_and_test
+    name: "3 · SAST (Semgrep + Bandit)"    # Display name
+    runs-on: ubuntu-latest                 # Runner OS
+    needs: install_and_test                # Wait for job 1 (runs in parallel with job 2)
     steps:
-      - name: Checkout
+      - name: Checkout                    # Step 1: Get code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python                # Step 2: Install Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Install Bandit
+      - name: Install Bandit               # Step 3: Install Bandit security linter
         run: pip install "bandit==1.7.5" "pbr>=5.0"
 
-      - name: Run Semgrep (custom project rules)
+      - name: Run Semgrep (custom project rules)  # Step 4: Run Semgrep SAST
         run: |
-          mkdir -p reports
+          mkdir -p reports                 # Create reports dir
           # Invoke Semgrep explicitly; this image version has no semgrep entrypoint.
           # --error → non-zero exit on ERROR severity (blocks the pipeline)
-          docker run --rm \
-            -v "$PWD:/src" \
-            -w /src \
-            ${{ env.SEMGREP_IMAGE }} \
-            semgrep \
-            --config .semgrep/custom.yaml \
-            --error \
-            --metrics=off \
-            --json \
-            --output /src/reports/semgrep-report.json \
-            app
+          docker run --rm \                # Run Docker, remove after
+            -v "$PWD:/src" \              # Mount current dir
+            -w /src \                      # Working dir
+            ${{ env.SEMGREP_IMAGE }} \    # Use Semgrep image
+            semgrep \                      # Run semgrep command
+            --config .semgrep/custom.yaml \  # Use custom rules
+            --error \                      # Fail on ERROR severity
+            --metrics=off \                # Disable metrics
+            --json \                       # JSON output
+            --output /src/reports/semgrep-report.json \  # Output file
+            app                            # Scan app directory
 
-      - name: Run Bandit
+      - name: Run Bandit                   # Step 5: Run Bandit SAST
         run: |
-          mkdir -p reports
+          mkdir -p reports                 # Create reports dir
           # -lll = HIGH severity and above only (MEDIUM would be "unstable"/warn)
-          bandit -r app -lll -f json -o reports/bandit-report.json
-          bandit -r app -lll -f txt
+          bandit -r app -lll -f json -o reports/bandit-report.json  # JSON report
+          bandit -r app -lll -f txt        # Terminal output
 
-      - name: Upload SAST reports
+      - name: Upload SAST reports           # Step 6: Save reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -218,7 +224,7 @@ jobs:
             reports/bandit-report.json
           if-no-files-found: ignore
 
-      - name: Send failure notification
+      - name: Send failure notification   # Step 7: Email if vulnerabilities found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -231,13 +237,13 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your DevSecOps pipeline has failed!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
             Failed Job: SAST (Semgrep + Bandit)
-            
+
             Security vulnerabilities were detected in your code. Please check the SAST reports.
           attachments: reports/semgrep-report.json,reports/bandit-report.json
 
@@ -245,63 +251,63 @@ jobs:
   # 4. SCA — dependency vulnerabilities (blocking on CRITICAL/HIGH)
   # ---------------------------------------------------------------------------
   scan_dependencies:
-    name: "4 · SCA (Trivy FS + pip-audit)"
-    runs-on: ubuntu-latest
-    needs: install_and_test
+    name: "4 · SCA (Trivy FS + pip-audit)"  # Display name
+    runs-on: ubuntu-latest                     # Runner OS
+    needs: install_and_test                    # Wait for job 1 (parallel with 2,3)
     steps:
-      - name: Checkout
+      - name: Checkout                        # Step 1: Get code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python                    # Step 2: Install Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Install app + pip-audit
+      - name: Install app + pip-audit           # Step 3: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install "pip-audit==2.6.1"
+          pip install -r requirements.txt       # Install app dependencies
+          pip install "pip-audit==2.6.1"        # Install pip-audit tool
 
-      - name: pip-audit (blocking on known vulns)
+      - name: pip-audit (blocking on known vulns)  # Step 4: Check Python packages
         run: |
-          mkdir -p reports
+          mkdir -p reports                     # Create reports dir
           # Keep the JSON report and console details even when vulnerabilities
           # make pip-audit return its expected non-zero status.
-          set +e
-          pip-audit -r requirements.txt --format json --output reports/pip-audit-report.json
-          audit_status=$?
-          pip-audit -r requirements.txt
-          table_status=$?
-          set -e
-          if [ "$audit_status" -ne 0 ] || [ "$table_status" -ne 0 ]; then
-            exit 1
+          set +e                               # Don't exit on error temporarily
+          pip-audit -r requirements.txt --format json --output reports/pip-audit-report.json  # JSON report
+          audit_status=$?                      # Save exit code
+          pip-audit -r requirements.txt        # Console output
+          table_status=$?                      # Save exit code
+          set -e                               # Exit on error again
+          if [ "$audit_status" -ne 0 ] || [ "$table_status" -ne 0 ]; then  # If either failed
+            exit 1                             # Fail the job
           fi
 
-      - name: Trivy filesystem scan (CRITICAL/HIGH → fail)
+      - name: Trivy filesystem scan (CRITICAL/HIGH → fail)  # Step 5: Scan files
         run: |
-          mkdir -p reports
-          docker run --rm \
+          mkdir -p reports                     # Create reports dir
+          docker run --rm \                    # Run Docker, remove after
+            -v "$PWD:/src" \                  # Mount current dir
+            -v trivy-cache:/root/.cache/ \     # Cache for speed
+            ${{ env.TRIVY_IMAGE }} \          # Use Trivy image
+            fs --severity CRITICAL,HIGH \      # Only CRITICAL and HIGH
+               --exit-code 1 \                # Exit 1 if vulnerabilities found
+               --ignore-unfixed \             # Ignore unfixed vulnerabilities
+               --format json \                # JSON output
+               --output /src/reports/trivy-fs-report.json \  # Output file
+               /src                            # Scan /src directory
+          docker run --rm \                    # Second run for table output
             -v "$PWD:/src" \
             -v trivy-cache:/root/.cache/ \
             ${{ env.TRIVY_IMAGE }} \
             fs --severity CRITICAL,HIGH \
                --exit-code 1 \
                --ignore-unfixed \
-               --format json \
-               --output /src/reports/trivy-fs-report.json \
-               /src
-          docker run --rm \
-            -v "$PWD:/src" \
-            -v trivy-cache:/root/.cache/ \
-            ${{ env.TRIVY_IMAGE }} \
-            fs --severity CRITICAL,HIGH \
-               --exit-code 1 \
-               --ignore-unfixed \
-               --format table \
+               --format table \                # Table format for console
                /src
 
-      - name: Upload SCA reports
+      - name: Upload SCA reports             # Step 6: Save reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -311,7 +317,7 @@ jobs:
             reports/trivy-fs-report.json
           if-no-files-found: ignore
 
-      - name: Send failure notification
+      - name: Send failure notification       # Step 7: Email if vulnerabilities found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -324,42 +330,85 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your DevSecOps pipeline has failed!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
             Failed Job: SCA (Trivy + pip-audit)
-            
+
             Vulnerable dependencies were detected. Please check the SCA reports.
           attachments: reports/pip-audit-report.json,reports/trivy-fs-report.json
 
   # ---------------------------------------------------------------------------
-  # 5. SonarQube Code Quality & SAST Scan
+  # 5. SBOM Generation (Software Bill of Materials)
+  # ---------------------------------------------------------------------------
+  generate_sbom:
+    name: "5 · Generate SBOM"
+    runs-on: ubuntu-latest                     # Runner OS
+    needs: install_and_test                    # Wait for job 1 (parallel with 2,3,4)
+    steps:
+      - name: Checkout                        # Step 1: Get code
+        uses: actions/checkout@v4
+
+      - name: Set up Python                    # Step 2: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies             # Step 3: Install app dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate SBOM with Syft          # Step 4: Generate Software Bill of Materials
+        run: |
+          mkdir -p reports
+          # Install Syft (SBOM generator)
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          # Generate SBOM in CycloneDX JSON format
+          syft . -o cyclonedx-json > reports/sbom.json
+          # Also generate SPDX JSON format (alternative standard)
+          syft . -o spdx-json > reports/sbom-spdx.json
+          # Generate human-readable table
+          syft . -o table > reports/sbom.txt
+
+      - name: Upload SBOM artifacts            # Step 5: Save SBOM reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            reports/sbom.json
+            reports/sbom-spdx.json
+            reports/sbom.txt
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # 6. SonarQube Code Quality & SAST Scan
   # ---------------------------------------------------------------------------
   sonarqube:
-    name: "5 · SonarQube Analysis"
-    runs-on: ubuntu-latest
-    needs: install_and_test
+    name: "6 · SonarQube Analysis"        # Display name
+    runs-on: ubuntu-latest                 # Runner OS
+    needs: install_and_test                # Wait for job 1 (parallel with 2,3,4,5)
     steps:
-      - name: Checkout repository
+      - name: Checkout repository          # Step 1: Get code with full history
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0                    # Full git history for blame info
 
-      - name: Download test coverage reports
+      - name: Download test coverage reports  # Step 2: Get coverage from job 1
         uses: actions/download-artifact@v4
         with:
-          name: test-reports
-          path: reports/
+          name: test-reports                # Artifact name from job 1
+          path: reports/                     # Download to reports dir
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+      - name: SonarQube Scan                # Step 3: Run SonarQube analysis
+        uses: SonarSource/sonarqube-scan-action@v5  # Official SonarQube action
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      # Auth token from secrets
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # SonarQube server URL
 
-      - name: Send failure notification
+      - name: Send failure notification       # Step 4: Email if quality gate fails
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -372,107 +421,108 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your DevSecOps pipeline has failed!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
             Failed Job: SonarQube Analysis
-            
+
             Code quality gate failed. Please check SonarQube for details.
 
   # ---------------------------------------------------------------------------
-  # 6. DAST — OWASP ZAP dynamic security scan (blocking on HIGH/CRITICAL)
+  # 7. DAST — Security Headers Check (blocking on failures)
   # ---------------------------------------------------------------------------
   dast:
-    name: "6 · DAST (OWASP ZAP)"
-    runs-on: ubuntu-latest
-    needs:
+    name: "7 · DAST (Security Headers)"    # Display name
+    runs-on: ubuntu-latest                 # Runner OS
+    needs:                                 # Wait for ALL previous jobs to complete
       - install_and_test
       - secrets_scan
       - sast
       - scan_dependencies
+      - generate_sbom
       - sonarqube
     steps:
-      - name: Checkout
+      - name: Checkout                    # Step 1: Get code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python                # Step 2: Install Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install dependencies           # Step 3: Install app dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: Start Flask application in background
+      - name: Start Flask application in background  # Step 4: Start the app for scanning
         env:
-          SECRET_KEY: test-secret-key-for-dast-must-be-32b
-          JWT_SECRET_KEY: test-jwt-secret-key-for-dast-32bytes!!
-          JWT_ACCESS_TOKEN_EXPIRES: "900"
+          SECRET_KEY: test-secret-key-for-dast-must-be-32b        # Flask secret
+          JWT_SECRET_KEY: test-jwt-secret-key-for-dast-32bytes!!  # JWT secret
+          JWT_ACCESS_TOKEN_EXPIRES: "900"                       # Token expiry
         run: |
-          python wsgi.py > app.log 2>&1 &
-          APP_PID=$!
-          echo "APP_PID=$APP_PID" >> $GITHUB_ENV
+          python wsgi.py > app.log 2>&1 &    # Start app in background, log to file
+          APP_PID=$!                        # Save process ID
+          echo "APP_PID=$APP_PID" >> $GITHUB_ENV  # Save to GitHub env for later
           echo "Waiting for app to start..."
-          sleep 15
+          sleep 15                           # Wait 15 seconds for startup
           # Check if app is running
-          if ! kill -0 $APP_PID 2>/dev/null; then
+          if ! kill -0 $APP_PID 2>/dev/null; then  # Check if process exists
             echo "App failed to start. Log:"
-            cat app.log
-            exit 1
+            cat app.log                      # Show log if failed
+            exit 1                           # Fail the job
           fi
           # Health check
-          curl -f http://localhost:5000/health || exit 1
+          curl -f http://localhost:5000/health || exit 1  # Test health endpoint
           echo "App is ready for scanning"
 
-      - name: Run DAST security checks
+      - name: Run DAST security checks     # Step 5: Check security headers
         run: |
-          mkdir -p reports
+          mkdir -p reports                 # Create reports dir
           echo "Running basic DAST checks..."
-          
+
           # Check for common security headers
-          response=$(curl -sI http://localhost:5000)
-          
+          response=$(curl -sI http://localhost:5000)  # Get HTTP headers
+
           echo "=== Security Headers Check ===" > reports/dast-report.txt
           echo "$response" >> reports/dast-report.txt
-          
+
           # Check for X-Content-Type-Options
           if echo "$response" | grep -q "X-Content-Type-Options"; then
             echo "✓ X-Content-Type-Options header present" >> reports/dast-report.txt
           else
             echo "✗ X-Content-Type-Options header missing" >> reports/dast-report.txt
           fi
-          
+
           # Check for X-Frame-Options
           if echo "$response" | grep -q "X-Frame-Options"; then
             echo "✓ X-Frame-Options header present" >> reports/dast-report.txt
           else
             echo "✗ X-Frame-Options header missing" >> reports/dast-report.txt
           fi
-          
+
           # Check for X-XSS-Protection
           if echo "$response" | grep -q "X-XSS-Protection"; then
             echo "✓ X-XSS-Protection header present" >> reports/dast-report.txt
           else
             echo "✗ X-XSS-Protection header missing" >> reports/dast-report.txt
           fi
-          
+
           echo "=== Endpoint Availability Check ===" >> reports/dast-report.txt
           curl -s http://localhost:5000/health && echo "✓ /health endpoint accessible" >> reports/dast-report.txt || echo "✗ /health endpoint failed" >> reports/dast-report.txt
-          
-          cat reports/dast-report.txt
 
-      - name: Stop Flask application
-        if: always()
+          cat reports/dast-report.txt        # Display report
+
+      - name: Stop Flask application         # Step 6: Stop the app (cleanup)
+        if: always()                      # Run even if scan fails
         run: |
-          if [ -n "$APP_PID" ]; then
-            kill $APP_PID || true
+          if [ -n "$APP_PID" ]; then       # If PID exists
+            kill $APP_PID || true          # Kill process, don't fail if already dead
           fi
 
-      - name: Upload DAST report
+      - name: Upload DAST report             # Step 7: Save report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -480,7 +530,7 @@ jobs:
           path: reports/dast-report.txt
           if-no-files-found: ignore
 
-      - name: Send failure notification
+      - name: Send failure notification       # Step 8: Email if scan fails
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -493,54 +543,55 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your DevSecOps pipeline has failed!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
             Failed Job: DAST (Security Headers Check)
-            
+
             Dynamic security scan failed. Please check the DAST report.
           attachments: reports/dast-report.txt
 
   # ---------------------------------------------------------------------------
-  # 7. Production deployment (only after every blocking check passes)
+  # 8. Production deployment (only after every blocking check passes)
   # ---------------------------------------------------------------------------
   deploy_vercel:
-    name: "7 · Deploy to Vercel"
-    runs-on: ubuntu-latest
-    needs:
+    name: "8 · Deploy to Vercel"         # Display name
+    runs-on: ubuntu-latest                 # Runner OS
+    needs:                                 # Wait for ALL security checks to pass
       - install_and_test
       - secrets_scan
       - sast
       - scan_dependencies
+      - generate_sbom
       - sonarqube
       - dast
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'  # Only on push to master
     steps:
-      - name: Checkout
+      - name: Checkout                    # Step 1: Get code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js                # Step 2: Install Node.js for Vercel CLI
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20"              # Node.js version
 
-      - name: Deploy to Vercel
+      - name: Deploy to Vercel             # Step 3: Deploy to production
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}          # Vercel auth token
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}          # Organization ID
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}  # Project ID
         run: |
-          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"  # Deploy command
 
-      - name: Download all reports
-        if: success()
+      - name: Download all reports           # Step 4: Download all artifacts
+        if: success()                      # Only if deployment succeeded
         uses: actions/download-artifact@v4
         with:
-          path: all-reports/
+          path: all-reports/                # Download all reports
 
-      - name: Send success notification
+      - name: Send success notification       # Step 5: Email success with all reports
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -553,12 +604,12 @@ jobs:
           from: DevSecOps Pipeline
           body: |
             Your application has been successfully deployed to Vercel!
-            
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref }}
             Commit: ${{ github.sha }}
             Actor: ${{ github.actor }}
-            
+
             All security checks passed:
             - ✅ Tests passed
             - ✅ Secrets scan passed
@@ -566,7 +617,6 @@ jobs:
             - ✅ SCA passed
             - ✅ SonarQube passed
             - ✅ DAST passed
-            
+
             All reports are attached to this email.
           attachments: all-reports/**/*.json,all-reports/**/*.xml,all-reports/**/*.txt
-

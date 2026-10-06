@@ -16,7 +16,7 @@ from app import create_app
 app = create_app()
 
 # For Vercel deployment, use /tmp for database if needed
-if os.environ.get('VERCEL'):
-    os.environ['DATABASE_URL'] = 'sqlite:////tmp/app.db'
+if os.environ.get("VERCEL"):
+    os.environ["DATABASE_URL"] = "sqlite:////tmp/app.db"
 
 # Vercel will automatically detect the 'app' variable in api/index.py
