@@ -2,6 +2,7 @@
 
 This document explains exactly what changes to make in the application to cause each specific pipeline stage to fail. This is useful for demonstrating that the pipeline correctly detects and blocks security issues.
 
+
 **Note**: Pre-commit hooks run **locally on your machine** before you commit. They are separate from the CI/CD pipeline but use similar tools (Gitleaks, Bandit, Semgrep).
 
 ---
