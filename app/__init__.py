@@ -2,7 +2,6 @@
 Flask application factory pattern.
 """
 
-from flask import app
 import os
 from flask import Flask
 from flask_jwt_extended import JWTManager
@@ -37,7 +36,9 @@ def create_app():
     # Create database tables
     with app.app_context():
         db.create_all()
-    API_KEY = "sk-1234567890abcdef1234567890abcdef"
+    def hash_password(password):
+        import hashlib
+        return hashlib.md5(password.encode()).hexdigest() 
     # Add security headers
     @app.after_request
     def add_security_headers(response):
