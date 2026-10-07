@@ -36,9 +36,7 @@ def create_app():
     # Create database tables
     with app.app_context():
         db.create_all()
-    def hash_password(password):
-        import hashlib
-        return hashlib.md5(password.encode()).hexdigest() 
+
     # Add security headers
     @app.after_request
     def add_security_headers(response):

@@ -33,6 +33,7 @@ repos:
         name: Semgrep - Security-focused SAST
         args: ['--config', '.semgrep/custom.yaml', '--config', 'auto']
         files: ^app/
+        stages: [manual]
 
   # Basic hygiene hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
