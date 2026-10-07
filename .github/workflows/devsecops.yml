@@ -700,6 +700,7 @@ jobs:
             - ✅ Secrets scan passed
             - ✅ SAST passed
             - ✅ SCA passed
+            - ✅ SBOM  passed
             - ✅ SonarQube passed
             - ✅ DAST passed
 

@@ -26,14 +26,11 @@ repos:
         additional_dependencies: ['pbr']
 
   # Semgrep - Custom and security-focused rules
-  - repo: https://github.com/returntocorp/semgrep
+  - repo: https://github.com/semgrep/semgrep
     rev: v1.45.0
     hooks:
       - id: semgrep
         name: Semgrep - Security-focused SAST
-        entry: python -m semgrep
-        language: python
-        additional_dependencies: ['semgrep==1.45.0']
         args: ['--config', '.semgrep/custom.yaml', '--config', 'auto']
         files: ^app/
 
