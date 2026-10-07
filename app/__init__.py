@@ -27,7 +27,7 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
-    jwt = JWTManager(app)
+    JWTManager(app)
 
     # Register blueprints
     app.register_blueprint(auth_bp)

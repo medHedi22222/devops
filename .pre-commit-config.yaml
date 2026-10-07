@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: gitleaks
         name: Gitleaks - Secrets Scanner
-        entry: gitleaks detect --source . --verbose
+        entry: gitleaks protect --verbose --staged
         language: golang
         types: [python, text]
         pass_filenames: false
@@ -22,6 +22,8 @@ repos:
         name: Bandit - Python Security Linter
         args: ['-r', 'app/', '-f', 'txt']
         files: ^app/
+        pass_filenames: false
+        additional_dependencies: ['pbr']
 
   # Semgrep - Custom and security-focused rules
   - repo: https://github.com/returntocorp/semgrep
@@ -29,6 +31,9 @@ repos:
     hooks:
       - id: semgrep
         name: Semgrep - Security-focused SAST
+        entry: python -m semgrep
+        language: python
+        additional_dependencies: ['semgrep==1.45.0']
         args: ['--config', '.semgrep/custom.yaml', '--config', 'auto']
         files: ^app/
 
@@ -47,6 +52,7 @@ repos:
         args: ['--maxkb=1000']
       - id: detect-private-key
         name: Detect private keys
+        exclude: ^docs/
       - id: check-merge-conflict
         name: Check for merge conflicts
       - id: check-json

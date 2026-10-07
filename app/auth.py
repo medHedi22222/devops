@@ -12,7 +12,6 @@ from flask_jwt_extended import (
     set_access_cookies,
 )
 from .models import db, User
-from .config import Config
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -97,7 +96,7 @@ def register():
             set_access_cookies(response, access_token)
             return response
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         return jsonify({"error": "Registration failed"}), 500
 
@@ -161,7 +160,7 @@ def login():
             set_access_cookies(response, access_token)
             return response
 
-    except Exception as e:
+    except Exception:
         return jsonify({"error": "Login failed"}), 500
 
 
@@ -210,5 +209,5 @@ def get_current_user():
 
         return jsonify({"user": user.to_dict()}), 200
 
-    except Exception as e:
+    except Exception:
         return jsonify({"error": "Failed to retrieve user"}), 500
