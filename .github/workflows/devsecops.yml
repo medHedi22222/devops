@@ -147,7 +147,15 @@ jobs:
           path: reports/gitleaks-report.json  # Report file
           if-no-files-found: ignore       # Don't fail if no file
 
-      - name: Send failure notification   # Step 4: Email if secrets found
+      - name: Download SBOM artifact (if available)
+        if: failure()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sbom-reports
+          path: reports/
+
+      - name: Send failure notification   # Step 5: Email if secrets found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -167,8 +175,8 @@ jobs:
             Actor: ${{ github.actor }}
             Failed Job: Secrets Scan (Gitleaks)
 
-            Secrets were detected in your code. Please check the Gitleaks report.
-          attachments: reports/gitleaks-report.json
+            Secrets were detected in your code. Please check the Gitleaks report and attached SBOM.
+          attachments: reports/gitleaks-report.json,reports/sbom.json,reports/sbom.txt
 
   # ---------------------------------------------------------------------------
   # 3. SAST — Semgrep + Bandit (blocking on high/error findings)
@@ -224,7 +232,15 @@ jobs:
             reports/bandit-report.json
           if-no-files-found: ignore
 
-      - name: Send failure notification   # Step 7: Email if vulnerabilities found
+      - name: Download SBOM artifact (if available)
+        if: failure()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sbom-reports
+          path: reports/
+
+      - name: Send failure notification   # Step 8: Email if vulnerabilities found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -244,8 +260,8 @@ jobs:
             Actor: ${{ github.actor }}
             Failed Job: SAST (Semgrep + Bandit)
 
-            Security vulnerabilities were detected in your code. Please check the SAST reports.
-          attachments: reports/semgrep-report.json,reports/bandit-report.json
+            Security vulnerabilities were detected in your code. Please check the SAST reports and attached SBOM.
+          attachments: reports/semgrep-report.json,reports/bandit-report.json,reports/sbom.json,reports/sbom.txt
 
   # ---------------------------------------------------------------------------
   # 4. SCA — dependency vulnerabilities (blocking on CRITICAL/HIGH)
@@ -317,7 +333,15 @@ jobs:
             reports/trivy-fs-report.json
           if-no-files-found: ignore
 
-      - name: Send failure notification       # Step 7: Email if vulnerabilities found
+      - name: Download SBOM artifact (if available)
+        if: failure()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sbom-reports
+          path: reports/
+
+      - name: Send failure notification       # Step 8: Email if vulnerabilities found
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -337,8 +361,8 @@ jobs:
             Actor: ${{ github.actor }}
             Failed Job: SCA (Trivy + pip-audit)
 
-            Vulnerable dependencies were detected. Please check the SCA reports.
-          attachments: reports/pip-audit-report.json,reports/trivy-fs-report.json
+            Vulnerable dependencies were detected. Please check the SCA reports and attached SBOM.
+          attachments: reports/pip-audit-report.json,reports/trivy-fs-report.json,reports/sbom.json,reports/sbom.txt
 
   # ---------------------------------------------------------------------------
   # 5. SBOM Generation (Software Bill of Materials)
@@ -383,6 +407,28 @@ jobs:
             reports/sbom.txt
           if-no-files-found: ignore
 
+      - name: Send failure notification       # Step 6: Email if SBOM generation fails
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your DevSecOps pipeline has failed!
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+            Failed Job: Generate SBOM
+
+            Software Bill of Materials (SBOM) generation failed. Please check the GitHub Actions logs.
+
   # ---------------------------------------------------------------------------
   # 6. SonarQube Code Quality & SAST Scan
   # ---------------------------------------------------------------------------
@@ -408,7 +454,15 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      # Auth token from secrets
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # SonarQube server URL
 
-      - name: Send failure notification       # Step 4: Email if quality gate fails
+      - name: Download SBOM artifact (if available)
+        if: failure()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sbom-reports
+          path: reports/
+
+      - name: Send failure notification       # Step 5: Email if quality gate fails
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -428,7 +482,8 @@ jobs:
             Actor: ${{ github.actor }}
             Failed Job: SonarQube Analysis
 
-            Code quality gate failed. Please check SonarQube for details.
+            Code quality gate failed. Please check SonarQube and attached SBOM for details.
+          attachments: reports/sbom.json,reports/sbom.txt
 
   # ---------------------------------------------------------------------------
   # 7. DAST — Security Headers Check (blocking on failures)
@@ -530,7 +585,15 @@ jobs:
           path: reports/dast-report.txt
           if-no-files-found: ignore
 
-      - name: Send failure notification       # Step 8: Email if scan fails
+      - name: Download SBOM artifact (if available)
+        if: failure()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: sbom-reports
+          path: reports/
+
+      - name: Send failure notification       # Step 9: Email if scan fails
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -550,8 +613,8 @@ jobs:
             Actor: ${{ github.actor }}
             Failed Job: DAST (Security Headers Check)
 
-            Dynamic security scan failed. Please check the DAST report.
-          attachments: reports/dast-report.txt
+            Dynamic security scan failed. Please check the DAST report and attached SBOM.
+          attachments: reports/dast-report.txt,reports/sbom.json,reports/sbom.txt
 
   # ---------------------------------------------------------------------------
   # 8. Production deployment (only after every blocking check passes)
@@ -586,12 +649,34 @@ jobs:
           npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"  # Deploy command
 
       - name: Download all reports           # Step 4: Download all artifacts
-        if: success()                      # Only if deployment succeeded
+        if: always()                       # Download reports on both success and failure
         uses: actions/download-artifact@v4
         with:
           path: all-reports/                # Download all reports
 
-      - name: Send success notification       # Step 5: Email success with all reports
+      - name: Send failure notification       # Step 5: Email if deployment fails
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Deployment Failed - DevSecOps Pipeline"
+          to: ${{ secrets.MAIL_TO }}
+          from: DevSecOps Pipeline
+          body: |
+            Your deployment to Vercel has failed!
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+
+            Deployment to Vercel failed. All security reports and SBOM are attached.
+          attachments: all-reports/**/*.json,all-reports/**/*.xml,all-reports/**/*.txt
+
+      - name: Send success notification       # Step 6: Email success with all reports
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
